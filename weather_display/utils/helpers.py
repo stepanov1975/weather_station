@@ -10,6 +10,7 @@ from datetime import datetime
 from .. import config
 from .localization import get_translation, get_day_name_localized, get_air_quality_text_localized
 from PIL import Image
+import customtkinter as ctk
 try:
     from PIL import ImageTk
 except ImportError:
@@ -77,9 +78,15 @@ def download_image(url, cache_dir, filename=None):
     if url.startswith('//'):
         url = f"https:{url}"
     
-    # Use the URL's filename if none provided
+    # Use the URL's filename if none provided, but preserve day/night distinction
     if not filename:
-        filename = os.path.basename(url)
+        # Extract the day/night part and the actual filename
+        url_parts = url.split('/')
+        if len(url_parts) >= 2 and (url_parts[-2] == 'day' or url_parts[-2] == 'night'):
+            # Use format like "day_113.png" or "night_113.png"
+            filename = f"{url_parts[-2]}_{url_parts[-1]}"
+        else:
+            filename = os.path.basename(url)
     
     cache_path = os.path.join(cache_dir, filename)
     
@@ -110,18 +117,15 @@ def load_image(path, size=None):
         size (tuple, optional): Size to resize the image to (width, height)
         
     Returns:
-        ImageTk.PhotoImage: Tkinter-compatible image or None if ImageTk is not available
+        CTkImage: CustomTkinter-compatible image or None if failed
     """
     try:
-        img = Image.open(path)
-        if size:
-            img = img.resize(size, Image.LANCZOS)
-        
-        # If ImageTk is available, return a Tkinter-compatible image
-        if ImageTk:
-            return ImageTk.PhotoImage(img)
-        # Otherwise, just return the PIL Image
-        return img
+        # Use CTkImage instead of ImageTk.PhotoImage for better HighDPI support
+        return ctk.CTkImage(
+            light_image=Image.open(path),
+            dark_image=Image.open(path),
+            size=size
+        )
     except Exception as e:
         logger.error(f"Failed to load image {path}: {e}")
         return None

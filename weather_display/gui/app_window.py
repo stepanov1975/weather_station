@@ -272,6 +272,16 @@ class AppWindow(ctk.CTk):
             # Translate air quality text
             translated_air_quality = translate_weather_condition(weather_data['air_quality_text'], config.LANGUAGE)
             self.air_quality_value.configure(text=translated_air_quality)
+        
+        # Update icon (if we add an icon to the current weather display in the future)
+        if 'icon_url' in weather_data and weather_data['icon_url']:
+            # Extract the day/night part and the actual filename for the icon
+            url_parts = weather_data['icon_url'].split('/')
+            if len(url_parts) >= 2 and (url_parts[-2] == 'day' or url_parts[-2] == 'night'):
+                # Use format like "day_113.png" or "night_113.png"
+                icon_filename = f"{url_parts[-2]}_{url_parts[-1]}"
+            else:
+                icon_filename = os.path.basename(weather_data['icon_url'])
     
     def update_forecast(self, forecast_data):
         """
@@ -294,9 +304,17 @@ class AppWindow(ctk.CTk):
             
             # Update icon
             if 'icon_url' in day_data and day_data['icon_url']:
-                icon_path = os.path.join('weather_display/assets/icons', os.path.basename(day_data['icon_url']))
+                # Extract the day/night part and the actual filename for the icon
+                url_parts = day_data['icon_url'].split('/')
+                if len(url_parts) >= 2 and (url_parts[-2] == 'day' or url_parts[-2] == 'night'):
+                    # Use format like "day_113.png" or "night_113.png"
+                    icon_filename = f"{url_parts[-2]}_{url_parts[-1]}"
+                else:
+                    icon_filename = os.path.basename(day_data['icon_url'])
+                
+                icon_path = os.path.join('weather_display/assets/icons', icon_filename)
                 if os.path.exists(icon_path):
-                    icon_image = load_image(icon_path, size=(96, 96))  # Increased from 64x64
+                    icon_image = load_image(icon_path, size=(96, 96))  # Adjusted size for better display
                     if icon_image:
                         frame['icon'].configure(image=icon_image)
                         # Keep a reference to prevent garbage collection

@@ -215,11 +215,12 @@ class WeatherAPIClient:
         base_date = datetime.now()
         forecast = []
         
-        conditions = ['Sunny', 'Partly cloudy', 'Cloudy', 'Light rain', 'Moderate rain']
+        conditions = ['Sunny', 'Partly cloudy', 'Cloudy', 'Patchy rain nearby', 'Light rain', 'Moderate rain']
         icons = [
             '//cdn.weatherapi.com/weather/64x64/day/113.png',  # Sunny
             '//cdn.weatherapi.com/weather/64x64/day/116.png',  # Partly cloudy
             '//cdn.weatherapi.com/weather/64x64/day/119.png',  # Cloudy
+            '//cdn.weatherapi.com/weather/64x64/day/176.png',  # Patchy rain nearby
             '//cdn.weatherapi.com/weather/64x64/day/296.png',  # Light rain
             '//cdn.weatherapi.com/weather/64x64/day/302.png'   # Moderate rain
         ]
