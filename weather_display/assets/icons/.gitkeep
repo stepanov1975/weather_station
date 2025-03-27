@@ -1,0 +1,2 @@
+# This file is here to ensure the icons directory is created when the repository is cloned.
+# Weather icons will be downloaded and stored in this directory at runtime.
