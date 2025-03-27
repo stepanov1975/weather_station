@@ -7,7 +7,7 @@ import random
 from datetime import datetime, timedelta
 import logging
 
-from ..utils.helpers import fetch_with_retry, download_image, get_air_quality_text
+from ..utils.helpers import fetch_with_retry, download_image, get_air_quality_text, check_internet_connection
 from .. import config
 
 logger = logging.getLogger(__name__)
@@ -37,8 +37,18 @@ class WeatherAPIClient:
         # Flag to use mock data if no API key is provided
         self.use_mock_data = config.USE_MOCK_DATA or not self.api_key
         
+        # Internet connection status
+        self._connection_status = check_internet_connection()
+        
         if self.use_mock_data:
             logger.warning("Using mock weather data (no API key provided)")
+    
+    @property
+    def connection_status(self):
+        """Get the current internet connection status."""
+        # Update the connection status
+        self._connection_status = check_internet_connection()
+        return self._connection_status
     
     def get_current_weather(self, force_refresh=False):
         """
@@ -48,20 +58,30 @@ class WeatherAPIClient:
             force_refresh (bool, optional): Force refresh from API
             
         Returns:
-            dict: Current weather data
+            dict: Current weather data with connection status
         """
         current_time = time.time()
+        
+        # Check internet connection
+        has_connection = self.connection_status
         
         # If cache is valid (less than 30 minutes old) and not forced refresh
         if (not force_refresh and 
             self.cache['current'] and 
             self.cache['last_update'] and 
             current_time - self.cache['last_update'] < config.WEATHER_UPDATE_INTERVAL_MINUTES * 60):
-            return self.cache['current']
+            # Add connection status to cached data
+            result = self.cache['current'].copy()
+            result['connection_status'] = has_connection
+            return result
         
-        # Use mock data if configured
-        if self.use_mock_data:
-            return self._get_mock_current_weather()
+        # Use mock data if configured or no internet connection
+        if self.use_mock_data or not has_connection:
+            if not has_connection:
+                logger.warning("No internet connection, using mock or cached data")
+            result = self._get_mock_current_weather()
+            result['connection_status'] = has_connection
+            return result
         
         # Otherwise, fetch new data
         try:
@@ -78,9 +98,13 @@ class WeatherAPIClient:
                 # If API call failed but we have cached data, use that
                 if self.cache['current']:
                     logger.warning("Using cached weather data due to API failure")
-                    return self.cache['current']
+                    result = self.cache['current'].copy()
+                    result['connection_status'] = False  # API call failed
+                    return result
                 # Otherwise use mock data
-                return self._get_mock_current_weather()
+                result = self._get_mock_current_weather()
+                result['connection_status'] = False  # API call failed
+                return result
             
             # Parse the API response
             current = data.get('current', {})
@@ -99,11 +123,14 @@ class WeatherAPIClient:
                 'air_quality_index': current.get('air_quality', {}).get('us-epa-index'),
                 'air_quality_text': get_air_quality_text(
                     current.get('air_quality', {}).get('us-epa-index')
-                )
+                ),
+                'connection_status': True  # We have a successful API response, so connection is good
             }
             
-            # Update cache
-            self.cache['current'] = parsed_data
+            # Update cache (without connection status as it's dynamic)
+            cache_data = parsed_data.copy()
+            del cache_data['connection_status']
+            self.cache['current'] = cache_data
             self.cache['last_update'] = current_time
             
             return parsed_data
@@ -111,7 +138,14 @@ class WeatherAPIClient:
         except Exception as e:
             logger.error(f"Error fetching current weather: {e}")
             # Return cached data if available, otherwise mock data
-            return self.cache['current'] if self.cache['current'] else self._get_mock_current_weather()
+            if self.cache['current']:
+                result = self.cache['current'].copy()
+                result['connection_status'] = False  # Exception occurred
+                return result
+            else:
+                result = self._get_mock_current_weather()
+                result['connection_status'] = False  # Exception occurred
+                return result
     
     def get_forecast(self, days=3, force_refresh=False):
         """
@@ -122,20 +156,38 @@ class WeatherAPIClient:
             force_refresh (bool, optional): Force refresh from API
             
         Returns:
-            list: List of forecast data for each day
+            list: List of forecast data for each day with connection status
         """
         current_time = time.time()
+        
+        # Check internet connection
+        has_connection = self.connection_status
         
         # If cache is valid (less than 30 minutes old) and not forced refresh
         if (not force_refresh and 
             self.cache['forecast'] and 
             self.cache['last_update'] and 
             current_time - self.cache['last_update'] < config.WEATHER_UPDATE_INTERVAL_MINUTES * 60):
-            return self.cache['forecast']
+            # Add connection status to result
+            result = self.cache['forecast'].copy()
+            # Add connection status to the result dictionary
+            result_with_status = {
+                'forecast': result,
+                'connection_status': has_connection
+            }
+            return result_with_status
         
-        # Use mock data if configured
-        if self.use_mock_data:
-            return self._get_mock_forecast(days)
+        # Use mock data if configured or no internet connection
+        if self.use_mock_data or not has_connection:
+            if not has_connection:
+                logger.warning("No internet connection, using mock or cached data for forecast")
+            result = self._get_mock_forecast(days)
+            # Add connection status to the result dictionary
+            result_with_status = {
+                'forecast': result,
+                'connection_status': has_connection
+            }
+            return result_with_status
         
         # Otherwise, fetch new data
         try:
@@ -153,9 +205,15 @@ class WeatherAPIClient:
                 # If API call failed but we have cached data, use that
                 if self.cache['forecast']:
                     logger.warning("Using cached forecast data due to API failure")
-                    return self.cache['forecast']
+                    return {
+                        'forecast': self.cache['forecast'],
+                        'connection_status': False  # API call failed
+                    }
                 # Otherwise use mock data
-                return self._get_mock_forecast(days)
+                return {
+                    'forecast': self._get_mock_forecast(days),
+                    'connection_status': False  # API call failed
+                }
             
             # Parse the API response
             forecast_days = []
@@ -179,12 +237,25 @@ class WeatherAPIClient:
             self.cache['forecast'] = forecast_days
             self.cache['last_update'] = current_time
             
-            return forecast_days
+            # Return forecast with connection status
+            return {
+                'forecast': forecast_days,
+                'connection_status': True  # We have a successful API response, so connection is good
+            }
             
         except Exception as e:
             logger.error(f"Error fetching forecast: {e}")
             # Return cached data if available, otherwise mock data
-            return self.cache['forecast'] if self.cache['forecast'] else self._get_mock_forecast(days)
+            if self.cache['forecast']:
+                return {
+                    'forecast': self.cache['forecast'],
+                    'connection_status': False  # Exception occurred
+                }
+            else:
+                return {
+                    'forecast': self._get_mock_forecast(days),
+                    'connection_status': False  # Exception occurred
+                }
     
     def _get_mock_current_weather(self):
         """

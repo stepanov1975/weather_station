@@ -6,6 +6,7 @@ import os
 import logging
 import requests
 import time
+import socket
 from datetime import datetime
 from .. import config
 from .localization import get_translation, get_day_name_localized, get_air_quality_text_localized
@@ -167,3 +168,23 @@ def get_day_name(date_str):
         str: Day name (e.g., 'Monday')
     """
     return get_day_name_localized(date_str, config.LANGUAGE)
+
+def check_internet_connection(host="8.8.8.8", port=53, timeout=3):
+    """
+    Check if there is an internet connection by trying to connect to Google's DNS.
+    
+    Args:
+        host (str, optional): Host to connect to. Default is Google's DNS.
+        port (int, optional): Port to connect to. Default is 53 (DNS).
+        timeout (int, optional): Timeout in seconds. Default is 3.
+        
+    Returns:
+        bool: True if internet connection is available, False otherwise.
+    """
+    try:
+        # Try to create a socket connection to the specified host and port
+        socket.setdefaulttimeout(timeout)
+        socket.socket(socket.AF_INET, socket.SOCK_STREAM).connect((host, port))
+        return True
+    except (socket.error, socket.timeout):
+        return False

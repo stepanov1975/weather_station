@@ -65,15 +65,21 @@ class AppWindow(ctk.CTk):
         
         # Configure grid layout
         self.grid_columnconfigure(0, weight=1)
-        self.grid_rowconfigure(0, weight=1)  # Top frame
-        self.grid_rowconfigure(1, weight=1)  # Bottom frame
+        self.grid_rowconfigure(0, weight=0)  # Connection status frame
+        self.grid_rowconfigure(1, weight=1)  # Top frame
+        self.grid_rowconfigure(2, weight=1)  # Bottom frame
         
         # Create frames
+        self.connection_frame = ctk.CTkFrame(self, corner_radius=0, height=30)
+        self.connection_frame.grid(row=0, column=0, sticky="ew")
+        self.connection_frame.grid_columnconfigure(0, weight=1)
+        self.connection_frame.grid_propagate(False)  # Prevent frame from resizing to fit content
+        
         self.top_frame = ctk.CTkFrame(self, corner_radius=0)
-        self.top_frame.grid(row=0, column=0, sticky="nsew")
+        self.top_frame.grid(row=1, column=0, sticky="nsew")
         
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=0)
-        self.bottom_frame.grid(row=1, column=0, sticky="nsew")
+        self.bottom_frame.grid(row=2, column=0, sticky="nsew")
         
         # Configure frame grid layout
         self.top_frame.grid_columnconfigure(0, weight=1)
@@ -94,6 +100,17 @@ class AppWindow(ctk.CTk):
     
     def _create_widgets(self):
         """Create and configure widgets."""
+        # Connection status indicator
+        self.connection_indicator = ctk.CTkLabel(
+            self.connection_frame,
+            text=get_translation('no_internet', config.LANGUAGE),
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=14),
+            fg_color="#FF5555",  # Red background for no connection
+            text_color="#FFFFFF",  # White text
+            corner_radius=5
+        )
+        self.connection_indicator.grid(row=0, column=0, sticky="e", padx=10, pady=5)
+        self.connection_indicator.grid_remove()  # Hide by default, will be shown when needed
         # Time display
         self.time_label = ctk.CTkLabel(
             self.top_frame,
@@ -259,6 +276,10 @@ class AppWindow(ctk.CTk):
         Args:
             weather_data (dict): Current weather data
         """
+        # Check for connection status
+        if 'connection_status' in weather_data:
+            self.update_connection_status(weather_data['connection_status'])
+        
         # Update temperature
         if 'temperature' in weather_data:
             self.temp_value.configure(text=f"{int(round(weather_data['temperature']))}°C")
@@ -288,9 +309,23 @@ class AppWindow(ctk.CTk):
         Update the forecast display.
         
         Args:
-            forecast_data (list): List of forecast data for each day
+            forecast_data (dict or list): Forecast data with connection status
         """
-        for i, day_data in enumerate(forecast_data):
+        # Check for connection status
+        if isinstance(forecast_data, dict) and 'connection_status' in forecast_data:
+            self.update_connection_status(forecast_data['connection_status'])
+            # Extract the actual forecast data
+            if 'forecast' in forecast_data:
+                forecast_days = forecast_data['forecast']
+            else:
+                # If no forecast data is available, return
+                return
+        else:
+            # For backward compatibility, assume it's just a list of forecast days
+            forecast_days = forecast_data
+        
+        # Update forecast frames
+        for i, day_data in enumerate(forecast_days):
             if i >= len(self.forecast_frames):
                 break
             
@@ -330,6 +365,23 @@ class AppWindow(ctk.CTk):
                 max_temp = int(round(day_data['max_temp']))
                 min_temp = int(round(day_data['min_temp']))
                 frame['temp'].configure(text=f"{max_temp}°C / {min_temp}°C")
+    
+    def update_connection_status(self, is_connected):
+        """
+        Update the connection status indicator.
+        
+        Args:
+            is_connected (bool): True if internet connection is available, False otherwise
+        """
+        if is_connected:
+            # Hide the indicator when connected
+            self.connection_indicator.grid_remove()
+        else:
+            # Show the indicator when not connected
+            self.connection_indicator.grid()
+            # Make sure it's visible by bringing it to the front
+            self.connection_indicator.lift()
+            logger.warning("No internet connection detected")
     
     def exit_fullscreen(self, event=None):
         """Exit fullscreen mode."""

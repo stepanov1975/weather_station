@@ -41,6 +41,9 @@ class WeatherDisplayApp:
         # Initialize the GUI
         self.app_window = None
         
+        # Track connection status
+        self.last_connection_status = False
+        
         logger.info("Weather Display application initialized")
     
     def start(self):
@@ -78,6 +81,10 @@ class WeatherDisplayApp:
         weather_thread = threading.Thread(target=self._weather_update_loop, daemon=True)
         weather_thread.start()
         
+        # Connection monitoring thread
+        connection_thread = threading.Thread(target=self._connection_monitoring_loop, daemon=True)
+        connection_thread.start()
+        
         logger.info("Update threads started")
     
     def _time_update_loop(self):
@@ -85,6 +92,27 @@ class WeatherDisplayApp:
         while self.running:
             self._update_time_and_date()
             time.sleep(config.UPDATE_INTERVAL_SECONDS)
+    
+    def _connection_monitoring_loop(self):
+        """Connection monitoring loop that checks internet connectivity every 30 seconds."""
+        while self.running:
+            # Get current connection status
+            current_status = self.weather_client.connection_status
+            
+            # If connection was down but is now up, update weather immediately
+            if not self.last_connection_status and current_status:
+                logger.info("Internet connection restored. Updating weather data immediately.")
+                self._update_weather()
+            
+            # Update the connection status in the UI
+            if self.app_window:
+                self.app_window.after(0, lambda: self.app_window.update_connection_status(current_status))
+            
+            # Store current status for next check
+            self.last_connection_status = current_status
+            
+            # Wait 30 seconds before checking again
+            time.sleep(30)
     
     def _weather_update_loop(self):
         """Weather update loop."""
@@ -119,9 +147,16 @@ class WeatherDisplayApp:
                 self.app_window.after(0, lambda: self.app_window.update_current_weather(current_weather))
                 self.app_window.after(0, lambda: self.app_window.update_forecast(forecast))
             
+            # Check connection status from current weather data
+            if 'connection_status' in current_weather:
+                logger.info(f"Internet connection status: {'Connected' if current_weather['connection_status'] else 'Disconnected'}")
+            
             logger.info("Weather data updated")
         except Exception as e:
             logger.error(f"Error updating weather: {e}")
+            # If there's an exception, assume there's no internet connection
+            if self.app_window:
+                self.app_window.after(0, lambda: self.app_window.update_connection_status(False))
 
 
 def parse_arguments():
@@ -132,6 +167,23 @@ def parse_arguments():
     parser.add_argument('--windowed', action='store_true', help='Run in windowed mode instead of fullscreen')
     return parser.parse_args()
 
+
+def wait_for_internet_connection():
+    """
+    Wait for internet connection, checking every 10 seconds.
+    
+    Returns:
+        bool: True when connection is established
+    """
+    from weather_display.utils.helpers import check_internet_connection
+    
+    while True:
+        if check_internet_connection():
+            logger.info("Internet connection established")
+            return True
+        
+        logger.info("No internet connection. Waiting 10 seconds before checking again...")
+        time.sleep(10)
 
 def main():
     """Main entry point."""
@@ -157,6 +209,12 @@ def main():
     
     if args.windowed:
         config.FULLSCREEN = False
+    
+    # Wait for internet connection before starting the application
+    # Skip waiting if using mock data
+    if not config.USE_MOCK_DATA:
+        logger.info("Checking for internet connection...")
+        wait_for_internet_connection()
     
     # Create and start the application
     app = WeatherDisplayApp(api_key=config.WEATHER_API_KEY)

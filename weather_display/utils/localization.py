@@ -79,7 +79,8 @@ TRANSLATIONS = {
         
         # Other
         'day': 'Day',
-        'unknown': 'Unknown'
+        'unknown': 'Unknown',
+        'no_internet': 'No Internet Connection'
     },
     'ru': {
         # App title
@@ -144,7 +145,8 @@ TRANSLATIONS = {
         
         # Other
         'day': 'День',
-        'unknown': 'Неизвестно'
+        'unknown': 'Неизвестно',
+        'no_internet': 'Нет Подключения к Интернету'
     }
 }
 
