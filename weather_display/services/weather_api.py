@@ -13,7 +13,25 @@ from .. import config
 logger = logging.getLogger(__name__)
 
 class WeatherAPIClient:
-    """Client for interacting with the WeatherAPI.com API."""
+    """
+    Client for interacting with the WeatherAPI.com API.
+    
+    This class handles all interactions with the WeatherAPI.com service,
+    including fetching current weather data and forecasts. It supports
+    both real API calls and mock data for testing purposes.
+    
+    Attributes:
+        api_key (str): WeatherAPI.com API key for authentication
+        base_url (str): Base URL for the WeatherAPI.com service
+        location (str): Location for weather data (default: Hadera, Israel)
+        use_mock (bool): Whether to use mock data instead of real API calls
+        
+    Methods:
+        get_current_weather(): Get current weather conditions
+        get_forecast(days=3): Get weather forecast for specified number of days
+        _get_mock_current_weather(): Get mock current weather data
+        _get_mock_forecast(days=3): Get mock forecast data
+    """
     
     def __init__(self, api_key=None, location=None):
         """

@@ -253,10 +253,14 @@ class AppWindow(ctk.CTk):
     
     def update_time(self, time_str):
         """
-        Update the time display.
+        Update the time display in the application window.
         
         Args:
-            time_str (str): Time string in HH:MM:SS format
+            time_str (str): Time string in HH:MM:SS format to display
+            
+        Note:
+            This method updates both the time and date labels in the top frame
+            of the application window. The time is displayed in 24-hour format.
         """
         self.time_label.configure(text=time_str)
     

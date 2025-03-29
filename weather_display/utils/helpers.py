@@ -111,14 +111,20 @@ def download_image(url, cache_dir, filename=None):
 
 def load_image(path, size=None):
     """
-    Load an image and optionally resize it.
+    Load and resize an image from the specified path.
     
     Args:
-        path (str): Path to the image
-        size (tuple, optional): Size to resize the image to (width, height)
-        
+        path (str): Path to the image file
+        size (tuple, optional): Desired size as (width, height) in pixels.
+                              If None, returns the original image.
+    
     Returns:
-        CTkImage: CustomTkinter-compatible image or None if failed
+        PIL.Image.Image or None: The loaded and resized image, or None if loading fails
+        
+    Note:
+        This function handles both regular PIL Image objects and CTkImage objects
+        for use with customtkinter widgets. If the image cannot be loaded,
+        it logs an error and returns None.
     """
     try:
         # Use CTkImage instead of ImageTk.PhotoImage for better HighDPI support

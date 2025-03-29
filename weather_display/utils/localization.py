@@ -289,12 +289,21 @@ def translate_weather_condition(condition, language='en'):
     """
     Translate a weather condition to the specified language.
     
+    This function maps common weather conditions to their localized translations
+    using predefined translation keys. It performs case-insensitive matching
+    to handle variations in the input text.
+    
     Args:
-        condition (str): Weather condition text
-        language (str): Language code (default: 'en')
-        
+        condition (str): Weather condition text to translate
+        language (str, optional): Language code for translation. Defaults to 'en'.
+    
     Returns:
-        str: Translated weather condition
+        str: Translated weather condition, or original text if no translation found
+        
+    Note:
+        The function uses a predefined mapping of weather conditions to translation
+        keys. If the input condition doesn't match any known patterns, the original
+        text is returned unchanged.
     """
     # Map common weather conditions to translation keys
     condition_map = {
