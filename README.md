@@ -1,15 +1,20 @@
 # Weather Display for Raspberry Pi 5
 
-A Python-based GUI application for Raspberry Pi 5 touchscreen that displays time, date, and weather information for Hadera, Israel.
+A Python-based GUI application for Raspberry Pi 5 touchscreen that displays time, date, and weather information for a configured location using the **AccuWeather API**.
 
 ## Features
 
 - Current time (hours/minutes/seconds) in 24-hour format
 - Current date, month, and year
-- Current temperature, humidity, and air quality for Hadera, Israel
-- 3-day forecast (high/low temperatures and weather conditions)
-- Dark-themed interface optimized for touchscreens
-- Fullscreen mode for a clean, kiosk-like view
+- Current temperature and humidity.
+- Current Air Quality Index (AQI) category and value (fetched via AccuWeather Indices API, depends on API plan).
+- 3-day forecast (high/low temperatures and weather conditions) (fetched via AccuWeather 5-day forecast API).
+- Dark-themed interface optimized for touchscreens.
+- Fullscreen mode for a clean, kiosk-like view.
+- Headless mode for running without a GUI (e.g., for testing via SSH).
+- Supports English and Russian languages.
+- Configurable location and update intervals.
+- Mock data mode for testing without an API key.
 
 ## Requirements
 
@@ -38,14 +43,21 @@ cd weather-display
 pip install customtkinter pillow requests
 ```
 
-3. Get a free API key from [WeatherAPI.com](https://www.weatherapi.com/):
-   - Sign up for a free account
-   - Navigate to your dashboard
-   - Copy your API key
+3. Get an API key from [AccuWeather Developer Portal](https://developer.accuweather.com/):
+   - Sign up for an account.
+   - Create an application to get an API key. Note that different features (like AQI or extended forecasts) might require specific API plans.
 
-4. Add your API key to the configuration:
-   - Edit `weather_display/config.py`
-   - Replace the empty string for `WEATHER_API_KEY` with your API key
+4. **Provide your API key via Environment Variable or Command Line:**
+   - **Environment Variable (Recommended):** Set the `ACCUWEATHER_API_KEY` environment variable before running the application.
+     ```bash
+     export ACCUWEATHER_API_KEY="YOUR_ACCUWEATHER_API_KEY"
+     python run_weather_display.py
+     ```
+   - **Command Line Argument:** Use the `--api-key` argument when running.
+     ```bash
+     python run_weather_display.py --api-key "YOUR_ACCUWEATHER_API_KEY"
+     ```
+   - **Note:** The API key is no longer stored in `config.py`.
 
 ## Usage
 
@@ -57,9 +69,10 @@ python run_weather_display.py
 
 ### Command Line Options
 
-- `--api-key KEY`: Specify the WeatherAPI.com API key
-- `--mock`: Use mock data instead of real API data (for testing)
-- `--windowed`: Run in windowed mode instead of fullscreen
+- `--api-key KEY`: Specify the AccuWeather API key (overrides environment variable).
+- `--mock`: Use mock data instead of real API data (for testing).
+- `--windowed`: Run in windowed mode instead of fullscreen.
+- `--headless`: Run without a GUI (logs data fetching to console/log file). Useful for testing in non-graphical environments.
 
 Example:
 
@@ -133,17 +146,20 @@ Terminal=false
 
 You can customize various aspects of the application by editing the `weather_display/config.py` file:
 
-- Change the location (default is Hadera, Israel)
-- Adjust update intervals
-- Modify UI settings (colors, fonts, sizes)
-- Toggle fullscreen mode
+- `LOCATION`: The location query for weather data (e.g., "City,Country"). AccuWeather uses this to find a location key.
+- `LANGUAGE`: Set to 'en' or 'ru'.
+- `ACCUWEATHER_API_KEY`: (Loaded from environment/argument) Your AccuWeather API key.
+- `WEATHER_UPDATE_INTERVAL_MINUTES`: How often to fetch new weather data.
+- `FULLSCREEN`: Set to `False` to disable fullscreen by default.
+- Font sizes, colors, etc.
 
 ## Troubleshooting
 
-- If the application fails to start, check the `weather_display.log` file for error messages
-- Ensure your API key is correct and has not exceeded its usage limits
-- Verify that your Raspberry Pi has an active internet connection
-- If using mock data (with `--mock` flag), no API key is required
+- If the application fails to start, check the `weather_display.log` file for error messages.
+- Ensure your API key is provided correctly (via environment or `--api-key`) and is valid for the required AccuWeather endpoints (Current Conditions, 5-Day Forecast, Indices API for AQI). Check your AccuWeather plan limits.
+- Verify that your Raspberry Pi has an active internet connection.
+- If using mock data (`--mock`), no API key is required.
+- If running with GUI and it fails with display errors, ensure a display environment is available (`DISPLAY` environment variable is set) or use `--headless`.
 
 ## License
 

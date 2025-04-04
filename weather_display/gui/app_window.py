@@ -1,12 +1,15 @@
 """
-Main application window for the Weather Display.
+Main application window (GUI) for the Weather Display using CustomTkinter.
+
+Displays time, date, current weather, forecast, and connection status.
 """
 
 import logging
 import customtkinter as ctk
 import os
 from PIL import Image
-from ..utils.localization import get_translation, translate_weather_condition
+# Import the new AQI translation function as well
+from ..utils.localization import get_translation, translate_weather_condition, translate_aqi_category
 try:
     from PIL import ImageTk
 except ImportError:
@@ -253,14 +256,10 @@ class AppWindow(ctk.CTk):
     
     def update_time(self, time_str):
         """
-        Update the time display in the application window.
+        Update the time display.
         
         Args:
-            time_str (str): Time string in HH:MM:SS format to display
-            
-        Note:
-            This method updates both the time and date labels in the top frame
-            of the application window. The time is displayed in 24-hour format.
+            time_str (str): Time string in HH:MM:SS format
         """
         self.time_label.configure(text=time_str)
     
@@ -278,7 +277,9 @@ class AppWindow(ctk.CTk):
         Update the current weather display.
         
         Args:
-            weather_data (dict): Current weather data
+            weather_data (dict): Current weather data dictionary from AccuWeatherClient.
+                                 Expected keys: 'temperature', 'humidity', 'air_quality_category',
+                                 'air_quality_index' (optional), 'connection_status'.
         """
         # Check for connection status
         if 'connection_status' in weather_data:
@@ -291,29 +292,32 @@ class AppWindow(ctk.CTk):
         # Update humidity
         if 'humidity' in weather_data:
             self.humidity_value.configure(text=f"{weather_data['humidity']}%")
-        
-        # Update air quality
-        if 'air_quality_text' in weather_data:
-            # Translate air quality text
-            translated_air_quality = translate_weather_condition(weather_data['air_quality_text'], config.LANGUAGE)
-            self.air_quality_value.configure(text=translated_air_quality)
-        
-        # Update icon (if we add an icon to the current weather display in the future)
-        if 'icon_url' in weather_data and weather_data['icon_url']:
-            # Extract the day/night part and the actual filename for the icon
-            url_parts = weather_data['icon_url'].split('/')
-            if len(url_parts) >= 2 and (url_parts[-2] == 'day' or url_parts[-2] == 'night'):
-                # Use format like "day_113.png" or "night_113.png"
-                icon_filename = f"{url_parts[-2]}_{url_parts[-1]}"
-            else:
-                icon_filename = os.path.basename(weather_data['icon_url'])
+
+        # Update air quality using the new category field and translation function
+        if 'air_quality_category' in weather_data and weather_data['air_quality_category'] is not None:
+            # Translate the AQI category (e.g., "Good", "Moderate")
+            translated_aqi = translate_aqi_category(weather_data['air_quality_category'], config.LANGUAGE)
+            # Optionally include the index value if available
+            aqi_index = weather_data.get('air_quality_index')
+            display_text = translated_aqi
+            if aqi_index is not None:
+                 display_text = f"{translated_aqi} ({aqi_index})" # e.g., "Good (25)"
+            self.air_quality_value.configure(text=display_text)
+        else:
+            # Display N/A if air quality data is not available
+            self.air_quality_value.configure(text=get_translation('not_available', config.LANGUAGE))
+
+        # Removed unused icon logic for current weather display
     
     def update_forecast(self, forecast_data):
         """
         Update the forecast display.
         
         Args:
-            forecast_data (dict or list): Forecast data with connection status
+            forecast_data (dict): Forecast data dictionary from AccuWeatherClient.
+                                  Expected structure: {'forecast': list[dict], 'connection_status': bool}.
+                                  Each dict in the 'forecast' list expects: 'date', 'icon_path',
+                                  'condition', 'max_temp', 'min_temp'.
         """
         # Check for connection status
         if isinstance(forecast_data, dict) and 'connection_status' in forecast_data:
@@ -333,42 +337,49 @@ class AppWindow(ctk.CTk):
             if i >= len(self.forecast_frames):
                 break
             
-            frame = self.forecast_frames[i]
-            
+            frame_info = self.forecast_frames[i]
+            frame_widget = frame_info['frame']
+            frame_widget.grid() # Make sure the frame is visible
+
             # Update day
             if 'date' in day_data:
                 from ..utils.helpers import get_day_name
-                day_name = get_day_name(day_data['date'])
-                frame['day'].configure(text=day_name)
-            
-            # Update icon
-            if 'icon_url' in day_data and day_data['icon_url']:
-                # Extract the day/night part and the actual filename for the icon
-                url_parts = day_data['icon_url'].split('/')
-                if len(url_parts) >= 2 and (url_parts[-2] == 'day' or url_parts[-2] == 'night'):
-                    # Use format like "day_113.png" or "night_113.png"
-                    icon_filename = f"{url_parts[-2]}_{url_parts[-1]}"
+                # AccuWeather date format is like '2025-04-05T07:00:00+03:00'
+                # Extract just the date part for get_day_name
+                date_part = day_data['date'].split('T')[0]
+                day_name = get_day_name(date_part)
+                frame_info['day'].configure(text=day_name)
+
+            # Update icon using the direct path from the API client
+            if 'icon_path' in day_data and day_data['icon_path'] and os.path.exists(day_data['icon_path']):
+                icon_image = load_image(day_data['icon_path'], size=(96, 96))
+                if icon_image:
+                    frame_info['icon'].configure(image=icon_image, text="") # Clear text if image loads
+                    # Keep a reference to prevent garbage collection
+                    frame_info['icon'].image = icon_image
                 else:
-                    icon_filename = os.path.basename(day_data['icon_url'])
-                
-                icon_path = os.path.join('weather_display/assets/icons', icon_filename)
-                if os.path.exists(icon_path):
-                    icon_image = load_image(icon_path, size=(96, 96))  # Adjusted size for better display
-                    if icon_image:
-                        frame['icon'].configure(image=icon_image)
-                        # Keep a reference to prevent garbage collection
-                        frame['icon'].image = icon_image
-            
+                    # Clear image if loading fails
+                    frame_info['icon'].configure(image=None, text=get_translation('icon_missing', config.LANGUAGE))
+            else:
+                 # Clear image if path is missing or invalid
+                 frame_info['icon'].configure(image=None, text=get_translation('icon_missing', config.LANGUAGE))
+
+
             # Update condition
             if 'condition' in day_data:
                 translated_condition = translate_weather_condition(day_data['condition'], config.LANGUAGE)
-                frame['condition'].configure(text=translated_condition)
-            
+                # Corrected variable name from 'frame' to 'frame_info'
+                frame_info['condition'].configure(text=translated_condition)
+
             # Update temperature
             if 'max_temp' in day_data and 'min_temp' in day_data:
                 max_temp = int(round(day_data['max_temp']))
                 min_temp = int(round(day_data['min_temp']))
-                frame['temp'].configure(text=f"{max_temp}°C / {min_temp}°C")
+                frame_info['temp'].configure(text=f"{max_temp}°C / {min_temp}°C")
+
+        # No need to hide frames anymore, the loop already limits processing
+        # to the number of available frames (3) or the number of forecast days received,
+        # whichever is smaller.
     
     def update_connection_status(self, is_connected):
         """

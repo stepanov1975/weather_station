@@ -1,5 +1,8 @@
 """
 Utility helper functions for the Weather Display application.
+
+Includes functions for API requests, image handling, text formatting,
+and checking internet connectivity.
 """
 
 import os
@@ -71,15 +74,18 @@ def download_image(url, cache_dir, filename=None):
         filename (str, optional): Filename to save the image as
         
     Returns:
-        str: Path to the cached image or None if failed
+        str | None: Path to the cached image if successful, otherwise None.
     """
     os.makedirs(cache_dir, exist_ok=True)
-    
-    # Add https: prefix if missing
+
+    # Add https: prefix if missing (common with some weather APIs)
     if url.startswith('//'):
         url = f"https:{url}"
     
-    # Use the URL's filename if none provided, but preserve day/night distinction
+        # Use the URL's filename if none provided.
+        # Note: The old logic for day/night prefixes is less relevant for AccuWeather icons
+        # but is kept for potential backward compatibility or other icon sources.
+        # The AccuWeatherClient now passes an explicit filename anyway.
     if not filename:
         # Extract the day/night part and the actual filename
         url_parts = url.split('/')
@@ -88,7 +94,7 @@ def download_image(url, cache_dir, filename=None):
             filename = f"{url_parts[-2]}_{url_parts[-1]}"
         else:
             filename = os.path.basename(url)
-    
+
     cache_path = os.path.join(cache_dir, filename)
     
     # Skip if already cached
@@ -111,20 +117,14 @@ def download_image(url, cache_dir, filename=None):
 
 def load_image(path, size=None):
     """
-    Load and resize an image from the specified path.
+    Load an image and optionally resize it.
     
     Args:
-        path (str): Path to the image file
-        size (tuple, optional): Desired size as (width, height) in pixels.
-                              If None, returns the original image.
-    
-    Returns:
-        PIL.Image.Image or None: The loaded and resized image, or None if loading fails
+        path (str): Path to the image
+        size (tuple, optional): Size to resize the image to (width, height)
         
-    Note:
-        This function handles both regular PIL Image objects and CTkImage objects
-        for use with customtkinter widgets. If the image cannot be loaded,
-        it logs an error and returns None.
+    Returns:
+        CTkImage: CustomTkinter-compatible image or None if failed
     """
     try:
         # Use CTkImage instead of ImageTk.PhotoImage for better HighDPI support
@@ -145,10 +145,10 @@ def format_temperature(temp):
         temp (float): Temperature in Celsius
         
     Returns:
-        str: Formatted temperature string
+        str: Formatted temperature string (e.g., "23°C") or "N/A".
     """
     if temp is None:
-        return "N/A"
+        return get_translation('not_available', config.LANGUAGE) # Use translation for consistency
     return f"{int(round(temp))}°C"
 
 def get_air_quality_text(index):
@@ -156,10 +156,10 @@ def get_air_quality_text(index):
     Convert air quality index to descriptive text.
     
     Args:
-        index (int): Air quality index (1-6)
-        
+        index (int): Air quality index (1-6) - Note: Based on old WeatherAPI.com index. Unused.
+
     Returns:
-        str: Descriptive text for the air quality
+        str: Descriptive text for the air quality.
     """
     return get_air_quality_text_localized(index, config.LANGUAGE)
 
@@ -168,10 +168,10 @@ def get_day_name(date_str):
     Get the day name from a date string.
     
     Args:
-        date_str (str): Date string in format 'YYYY-MM-DD'
-        
+        date_str (str): Date string, expected format 'YYYY-MM-DD'.
+
     Returns:
-        str: Day name (e.g., 'Monday')
+        str: Localized day name (e.g., 'Monday', 'Понедельник').
     """
     return get_day_name_localized(date_str, config.LANGUAGE)
 

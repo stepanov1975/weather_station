@@ -1,5 +1,9 @@
 """
 Localization module for the Weather Display application.
+
+Provides functions for translating text keys, formatting dates,
+and translating specific weather data (conditions, AQI categories)
+based on the selected language.
 """
 
 import logging
@@ -34,7 +38,9 @@ TRANSLATIONS = {
         'air_very_unhealthy': 'Very Unhealthy',
         'air_hazardous': 'Hazardous',
         'air_unknown': 'Unknown',
-        
+        'not_available': 'N/A', # Added for missing data
+        'icon_missing': 'Icon Missing', # Added for missing icons
+
         # Day names
         'monday': 'Monday',
         'tuesday': 'Tuesday',
@@ -76,7 +82,11 @@ TRANSLATIONS = {
         'patchy_snow': 'Patchy snow',
         'thunderstorm': 'Thunderstorm',
         'clear': 'Clear',
-        
+        'mostly_sunny': 'Mostly Sunny', # Added
+        'intermittent_clouds': 'Intermittent Clouds', # Added
+        'hazy_sunshine': 'Hazy Sunshine', # Added
+        'mostly_cloudy': 'Mostly Cloudy', # Added
+
         # Other
         'day': 'Day',
         'unknown': 'Unknown',
@@ -100,7 +110,9 @@ TRANSLATIONS = {
         'air_very_unhealthy': 'Очень вредно',
         'air_hazardous': 'Опасно',
         'air_unknown': 'Неизвестно',
-        
+        'not_available': 'Н/Д', # Added for missing data
+        'icon_missing': 'Нет Иконки', # Added for missing icons
+
         # Day names
         'monday': 'Понедельник',
         'tuesday': 'Вторник',
@@ -142,7 +154,11 @@ TRANSLATIONS = {
         'patchy_snow': 'Местами снег',
         'thunderstorm': 'Гроза',
         'clear': 'Ясно',
-        
+        'mostly_sunny': 'В основном солнечно', # Added
+        'intermittent_clouds': 'Временами облачно', # Added
+        'hazy_sunshine': 'Солнечно, дымка', # Added
+        'mostly_cloudy': 'В основном облачно', # Added
+
         # Other
         'day': 'День',
         'unknown': 'Неизвестно',
@@ -221,6 +237,30 @@ def get_translation(key, language='en'):
     
     return TRANSLATIONS[language].get(key, key)
 
+# Mapping from AccuWeather AQI Category strings to our internal translation keys
+ACCUWEATHER_AQI_CATEGORY_MAP = {
+    "Good": "air_good",
+    "Moderate": "air_moderate",
+    "Unhealthy for Sensitive Groups": "air_unhealthy_sensitive",
+    "Unhealthy": "air_unhealthy",
+    "Very Unhealthy": "air_very_unhealthy",
+    "Hazardous": "air_hazardous",
+}
+
+def translate_aqi_category(category, language='en'):
+    """
+    Translate an AccuWeather AQI category string to the specified language.
+
+    Args:
+        category (str): AQI category text from AccuWeather (e.g., "Good")
+        language (str): Language code (default: 'en')
+
+    Returns:
+        str: Translated AQI category
+    """
+    translation_key = ACCUWEATHER_AQI_CATEGORY_MAP.get(category, 'air_unknown')
+    return get_translation(translation_key, language)
+
 def get_formatted_date(language='en'):
     """
     Get the current date formatted according to the specified language.
@@ -247,9 +287,9 @@ def get_day_name_localized(date_str, language='en'):
     Get the localized day name from a date string.
     
     Args:
-        date_str (str): Date string in format 'YYYY-MM-DD'
-        language (str): Language code (default: 'en')
-        
+        date_str (str): Date string, expected format 'YYYY-MM-DD'.
+        language (str): Language code (default: 'en').
+
     Returns:
         str: Localized day name
     """
@@ -267,9 +307,10 @@ def get_air_quality_text_localized(index, language='en'):
     Convert air quality index to localized descriptive text.
     
     Args:
-        index (int): Air quality index (1-6)
-        language (str): Language code (default: 'en')
-        
+        index (int): Air quality index (1-6) - Note: This mapping is based on the old WeatherAPI.com index.
+                     It is currently unused as AccuWeather provides category names directly.
+        language (str): Language code (default: 'en').
+
     Returns:
         str: Localized descriptive text for the air quality
     """
@@ -289,21 +330,12 @@ def translate_weather_condition(condition, language='en'):
     """
     Translate a weather condition to the specified language.
     
-    This function maps common weather conditions to their localized translations
-    using predefined translation keys. It performs case-insensitive matching
-    to handle variations in the input text.
-    
     Args:
-        condition (str): Weather condition text to translate
-        language (str, optional): Language code for translation. Defaults to 'en'.
-    
+        condition (str | None): Weather condition text (e.g., "Sunny", "Partly cloudy").
+        language (str): Language code (default: 'en').
+
     Returns:
-        str: Translated weather condition, or original text if no translation found
-        
-    Note:
-        The function uses a predefined mapping of weather conditions to translation
-        keys. If the input condition doesn't match any known patterns, the original
-        text is returned unchanged.
+        str: Translated weather condition
     """
     # Map common weather conditions to translation keys
     condition_map = {
@@ -323,9 +355,16 @@ def translate_weather_condition(condition, language='en'):
         'Heavy snow': 'heavy_snow',
         'Patchy snow': 'patchy_snow',
         'Thunderstorm': 'thunderstorm',
-        'Clear': 'clear'
+        'Clear': 'clear',
+        # Added AccuWeather specific conditions
+        'Mostly Sunny': 'mostly_sunny',
+        'Intermittent Clouds': 'intermittent_clouds',
+        'Hazy Sunshine': 'hazy_sunshine',
+        'Mostly Cloudy': 'mostly_cloudy'
+        # Note: AccuWeather might have more variations (e.g., "Partly Sunny")
+        # This map can be expanded as needed based on observed API responses.
     }
-    
+
     # Convert condition to lowercase for case-insensitive matching
     condition_lower = condition.lower() if condition else ''
     

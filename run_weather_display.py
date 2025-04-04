@@ -1,26 +1,19 @@
 #!/usr/bin/env python3
 """
-Launcher script for the Weather Display application.
+Entry point script for the Weather Display application.
 
-This script serves as the entry point for the Weather Display application.
-It ensures the script is executable and launches the main application.
-
-Usage:
-    python run_weather_display.py [--api-key KEY] [--mock] [--windowed]
-
-Options:
-    --api-key KEY    WeatherAPI.com API key for weather data
-    --mock          Use mock data instead of real API calls
-    --windowed      Run in windowed mode instead of fullscreen
+This script simply imports and calls the main() function from weather_display.main.
+It ensures the package directory is in the Python path.
 """
 
 import os
 import sys
+
+# Ensure the weather_display package can be found
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+
+# Import and run the main function from the application logic module
 from weather_display.main import main
 
 if __name__ == "__main__":
-    # Make the script executable
-    os.chmod(__file__, 0o755)
-    
-    # Run the main function
     main()
