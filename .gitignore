@@ -44,6 +44,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+weather_venv/
 
 # IDE
 .idea/
