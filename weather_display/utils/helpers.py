@@ -49,13 +49,36 @@ def fetch_with_retry(url, params=None, max_retries=3, timeout=10):
     """
     retry_count = 0
     while retry_count < max_retries:
+        response = None # Initialize response to None
         try:
             response = requests.get(url, params=params, timeout=timeout)
+
+            # Check for specific AccuWeather API limit error *before* raise_for_status
+            # Common codes for this might be 403, 429, 503
+            if response.status_code in [403, 429, 503]:
+                try:
+                    error_data = response.json()
+                    if isinstance(error_data, dict) and error_data.get('Code') == 'ServiceUnavailable':
+                        logger.warning(f"AccuWeather API request limit likely exceeded (HTTP {response.status_code}). Response: {error_data.get('Message')}")
+                        # Return the specific error dictionary instead of None
+                        return error_data
+                except requests.exceptions.JSONDecodeError:
+                    # If the body isn't JSON, proceed to raise_for_status
+                    pass
+
+            # If it wasn't the specific error, proceed with normal status check
             response.raise_for_status()
             return response.json()
+
         except (requests.exceptions.RequestException, requests.exceptions.Timeout) as e:
+            # Log the underlying error, including status code if available
+            err_msg = f"{e}"
+            if response is not None:
+                err_msg = f"HTTP {response.status_code}: {e}"
+
             retry_count += 1
             if retry_count >= max_retries:
+                logger.error(f"Failed after {max_retries} attempts: {err_msg}")
                 logger.error(f"Failed after {max_retries} attempts: {e}")
                 return None
             # Exponential backoff: 1s, 2s, 4s, etc.

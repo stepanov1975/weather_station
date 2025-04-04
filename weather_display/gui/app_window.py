@@ -112,8 +112,21 @@ class AppWindow(ctk.CTk):
             text_color="#FFFFFF",  # White text
             corner_radius=5
         )
-        self.connection_indicator.grid(row=0, column=0, sticky="e", padx=10, pady=5)
-        self.connection_indicator.grid_remove()  # Hide by default, will be shown when needed
+        self.connection_indicator.grid(row=0, column=0, sticky="e", padx=(10, 5), pady=5)
+        self.connection_indicator.grid_remove()  # Hide by default
+
+        # API Limit status indicator
+        self.api_limit_indicator = ctk.CTkLabel(
+            self.connection_frame,
+            text=get_translation('api_limit_reached', config.LANGUAGE), # Need to add this translation
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=14),
+            fg_color="#FFA500",  # Orange background for API limit
+            text_color="#FFFFFF",  # White text
+            corner_radius=5
+        )
+        self.api_limit_indicator.grid(row=0, column=1, sticky="e", padx=(5, 10), pady=5)
+        self.api_limit_indicator.grid_remove() # Hide by default
+
         # Time display
         self.time_label = ctk.CTkLabel(
             self.top_frame,
@@ -279,26 +292,36 @@ class AppWindow(ctk.CTk):
         Args:
             weather_data (dict): Current weather data dictionary from AccuWeatherClient.
                                  Expected keys: 'temperature', 'humidity', 'air_quality_category',
-                                 'air_quality_index' (optional), 'connection_status'.
+                                 Expected structure: {'data': dict, 'connection_status': bool, 'api_status': str}.
+                                 The 'data' dict expects: 'temperature', 'humidity', 'air_quality_category',
+                                 'air_quality_index' (optional).
         """
-        # Check for connection status
-        if 'connection_status' in weather_data:
-            self.update_connection_status(weather_data['connection_status'])
-        
+        # Update status indicators first
+        connection_status = weather_data.get('connection_status', False)
+        api_status = weather_data.get('api_status', 'error')
+        self.update_status_indicators(connection_status, api_status)
+
+        # Extract the actual weather data
+        current_data = weather_data.get('data', {})
+
         # Update temperature
-        if 'temperature' in weather_data:
-            self.temp_value.configure(text=f"{int(round(weather_data['temperature']))}°C")
-        
+        if 'temperature' in current_data and current_data['temperature'] is not None:
+            self.temp_value.configure(text=f"{int(round(current_data['temperature']))}°C")
+        else:
+            self.temp_value.configure(text=get_translation('not_available', config.LANGUAGE))
+
         # Update humidity
-        if 'humidity' in weather_data:
-            self.humidity_value.configure(text=f"{weather_data['humidity']}%")
+        if 'humidity' in current_data and current_data['humidity'] is not None:
+            self.humidity_value.configure(text=f"{current_data['humidity']}%")
+        else:
+            self.humidity_value.configure(text=get_translation('not_available', config.LANGUAGE))
 
         # Update air quality using the new category field and translation function
-        if 'air_quality_category' in weather_data and weather_data['air_quality_category'] is not None:
+        if 'air_quality_category' in current_data and current_data['air_quality_category'] is not None:
             # Translate the AQI category (e.g., "Good", "Moderate")
-            translated_aqi = translate_aqi_category(weather_data['air_quality_category'], config.LANGUAGE)
+            translated_aqi = translate_aqi_category(current_data['air_quality_category'], config.LANGUAGE)
             # Optionally include the index value if available
-            aqi_index = weather_data.get('air_quality_index')
+            aqi_index = current_data.get('air_quality_index')
             display_text = translated_aqi
             if aqi_index is not None:
                  display_text = f"{translated_aqi} ({aqi_index})" # e.g., "Good (25)"
@@ -308,30 +331,25 @@ class AppWindow(ctk.CTk):
             self.air_quality_value.configure(text=get_translation('not_available', config.LANGUAGE))
 
         # Removed unused icon logic for current weather display
-    
-    def update_forecast(self, forecast_data):
+
+    def update_forecast(self, forecast_result):
         """
         Update the forecast display.
-        
+
         Args:
-            forecast_data (dict): Forecast data dictionary from AccuWeatherClient.
-                                  Expected structure: {'forecast': list[dict], 'connection_status': bool}.
-                                  Each dict in the 'forecast' list expects: 'date', 'icon_path',
-                                  'condition', 'max_temp', 'min_temp'.
+            forecast_result (dict): Forecast result dictionary from AccuWeatherClient.
+                                    Expected structure: {'data': list[dict], 'connection_status': bool, 'api_status': str}.
+                                    Each dict in the 'data' list expects: 'date', 'icon_path',
+                                    'condition', 'max_temp', 'min_temp'.
         """
-        # Check for connection status
-        if isinstance(forecast_data, dict) and 'connection_status' in forecast_data:
-            self.update_connection_status(forecast_data['connection_status'])
-            # Extract the actual forecast data
-            if 'forecast' in forecast_data:
-                forecast_days = forecast_data['forecast']
-            else:
-                # If no forecast data is available, return
-                return
-        else:
-            # For backward compatibility, assume it's just a list of forecast days
-            forecast_days = forecast_data
-        
+        # Update status indicators first
+        connection_status = forecast_result.get('connection_status', False)
+        api_status = forecast_result.get('api_status', 'error')
+        self.update_status_indicators(connection_status, api_status)
+
+        # Extract the actual forecast data list
+        forecast_days = forecast_result.get('data', [])
+
         # Update forecast frames
         for i, day_data in enumerate(forecast_days):
             if i >= len(self.forecast_frames):
@@ -366,38 +384,52 @@ class AppWindow(ctk.CTk):
 
 
             # Update condition
-            if 'condition' in day_data:
+            if 'condition' in day_data and day_data['condition'] is not None:
                 translated_condition = translate_weather_condition(day_data['condition'], config.LANGUAGE)
-                # Corrected variable name from 'frame' to 'frame_info'
                 frame_info['condition'].configure(text=translated_condition)
+            else:
+                frame_info['condition'].configure(text=get_translation('not_available', config.LANGUAGE))
+
 
             # Update temperature
-            if 'max_temp' in day_data and 'min_temp' in day_data:
+            if 'max_temp' in day_data and day_data['max_temp'] is not None and \
+               'min_temp' in day_data and day_data['min_temp'] is not None:
                 max_temp = int(round(day_data['max_temp']))
                 min_temp = int(round(day_data['min_temp']))
                 frame_info['temp'].configure(text=f"{max_temp}°C / {min_temp}°C")
+            else:
+                frame_info['temp'].configure(text=get_translation('not_available', config.LANGUAGE))
 
-        # No need to hide frames anymore, the loop already limits processing
-        # to the number of available frames (3) or the number of forecast days received,
-        # whichever is smaller.
-    
-    def update_connection_status(self, is_connected):
+
+        # Hide unused forecast frames if fewer than 3 days are received
+        for i in range(len(forecast_days), len(self.forecast_frames)):
+             self.forecast_frames[i]['frame'].grid_remove()
+
+
+    def update_status_indicators(self, connection_status, api_status):
         """
-        Update the connection status indicator.
-        
+        Update the connection and API limit status indicators.
+
         Args:
-            is_connected (bool): True if internet connection is available, False otherwise
+            connection_status (bool): True if internet connection is available.
+            api_status (str): Status from the API client ('ok', 'limit_reached', 'error', 'offline', 'mock').
         """
-        if is_connected:
-            # Hide the indicator when connected
-            self.connection_indicator.grid_remove()
-        else:
-            # Show the indicator when not connected
+        # Handle connection indicator
+        if not connection_status:
             self.connection_indicator.grid()
-            # Make sure it's visible by bringing it to the front
             self.connection_indicator.lift()
             logger.warning("No internet connection detected")
-    
+        else:
+            self.connection_indicator.grid_remove()
+
+        # Handle API limit indicator (only show if connected)
+        if connection_status and api_status == 'limit_reached':
+            self.api_limit_indicator.grid()
+            self.api_limit_indicator.lift()
+            logger.warning("API request limit reached")
+        else:
+            self.api_limit_indicator.grid_remove()
+
     def exit_fullscreen(self, event=None):
         """Exit fullscreen mode."""
         try:

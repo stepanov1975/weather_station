@@ -163,13 +163,10 @@ class WeatherDisplayApp:
             if not self.last_connection_status and current_status:
                 logger.info("Internet connection restored. Updating weather data immediately.")
                 self._update_weather()
-            
-            # Update the connection status in the UI only if GUI exists
-            if self.app_window:
-                self.app_window.after(0, lambda cs=current_status: self.app_window.update_connection_status(cs))
-            elif self.last_connection_status != current_status: # Log change in headless
+            # Connection status is now updated via _update_weather calls which have api_status info.
+            # We only log the change here in headless mode.
+            if not self.app_window and self.last_connection_status != current_status: # Log change in headless
                  logger.info(f"Connection status changed: {'Connected' if current_status else 'Disconnected'}")
-
 
             # Store current status for next check
             self.last_connection_status = current_status
@@ -229,10 +226,11 @@ class WeatherDisplayApp:
             logger.info("Weather data updated")
         except Exception as e:
             logger.error(f"Error updating weather: {e}")
-            # If there's an exception, assume there's no internet connection
-            # Update GUI status if it exists
+            # If there's an exception, update status indicators accordingly
+            # Assume connection might be down or another error occurred
             if self.app_window:
-                self.app_window.after(0, lambda: self.app_window.update_connection_status(False))
+                # Pass False for connection and 'error' for api_status
+                self.app_window.after(0, lambda: self.app_window.update_status_indicators(False, 'error'))
             elif self.last_connection_status: # Log change in headless
                  logger.warning("Connection status changed: Disconnected (due to error)")
                  self.last_connection_status = False

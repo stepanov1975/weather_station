@@ -90,7 +90,8 @@ TRANSLATIONS = {
         # Other
         'day': 'Day',
         'unknown': 'Unknown',
-        'no_internet': 'No Internet Connection'
+        'no_internet': 'No Internet Connection',
+        'api_limit_reached': 'API Limit Reached' # Added
     },
     'ru': {
         # App title
@@ -162,7 +163,8 @@ TRANSLATIONS = {
         # Other
         'day': 'День',
         'unknown': 'Неизвестно',
-        'no_internet': 'Нет Подключения к Интернету'
+        'no_internet': 'Нет Подключения к Интернету',
+        'api_limit_reached': 'Лимит API исчерпан' # Added
     }
 }
 
