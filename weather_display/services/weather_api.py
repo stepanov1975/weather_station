@@ -67,9 +67,9 @@ class AccuWeatherClient:
         self.api_key: Optional[str] = api_key or config.ACCUWEATHER_API_KEY
         self.location_query: str = location_query or config.LOCATION
         self.base_url: str = config.ACCUWEATHER_BASE_URL
-        self.language: str = "en-us"
+        self.language: str = config.ACCUWEATHER_LANGUAGE # Use language from config
 
-        logger.info(f"AccuWeatherClient initialized for location: '{self.location_query}'")
+        logger.info(f"AccuWeatherClient initialized for location: '{self.location_query}' with language '{self.language}'")
 
         # Initialize cache structure
         self.cache: Dict[str, Any] = {
@@ -154,9 +154,9 @@ class AccuWeatherClient:
             params = {
                 'apikey': self.api_key,
                 'q': self.location_query,
-                'language': "en-us"
+                'language': self.language # Use configured language
             }
-            logger.info(f"Fetching location key from API for query: '{self.location_query}'")
+            logger.info(f"Fetching location key from API for query: '{self.location_query}' (Lang: {self.language})")
             location_search_results = fetch_with_retry(url, params)
 
             # Handle potential API limit error returned by fetch_with_retry
@@ -232,8 +232,9 @@ class AccuWeatherClient:
                 'apikey': self.api_key,
                 'language': self.language,
             }
-            logger.info(f"Fetching AQI (Index {aqi_index_id}) for location key: {location_key}")
+            logger.info(f"Fetching AQI (Index {aqi_index_id}) for location key: {location_key} (Lang: {self.language})")
             aqi_data_list = fetch_with_retry(url, params)
+            logger.debug(f"Raw AQI API response: {aqi_data_list}") # Log the raw response
 
             # Handle potential API limit error
             if isinstance(aqi_data_list, dict) and aqi_data_list.get('Code') == 'ServiceUnavailable':

@@ -85,6 +85,7 @@ class WeatherDisplayApp:
         self.headless: bool = headless
         self.running: bool = False # Controls thread loops
         self._update_threads: List[threading.Thread] = []
+        self._time_update_job_id: Optional[str] = None # To store the 'after' job ID
 
         # Initialize services
         self.time_service = TimeService()
@@ -127,6 +128,8 @@ class WeatherDisplayApp:
             # Perform initial updates before starting loop
             self._update_time_and_date()
             self._update_weather()
+            # Start the time update loop using Tkinter's 'after'
+            self._update_time_and_date()
             self.app_window.mainloop() # Blocks until window is closed
             # After mainloop finishes (window closed), stop the app
             self.stop()
@@ -158,23 +161,34 @@ class WeatherDisplayApp:
         # Adjust sleep time if needed
         time.sleep(0.5)
 
-        # Join threads (optional, ensures they fully exit before proceeding)
-        # for thread in self._update_threads:
-        #     if thread.is_alive():
-        #         logger.debug(f"Waiting for thread {thread.name} to join...")
-        #         thread.join(timeout=1.0) # Add timeout
-        #         if thread.is_alive():
-        #              logger.warning(f"Thread {thread.name} did not join.")
+        # Cancel the scheduled time update job if it exists
+        if self.app_window and self._time_update_job_id:
+            try:
+                self.app_window.after_cancel(self._time_update_job_id)
+                logger.debug("Cancelled scheduled time update job.")
+                self._time_update_job_id = None
+            except Exception as e:
+                logger.error(f"Error cancelling time update job: {e}")
 
-        # Destroy GUI window if it exists (must be done from main thread)
+        # Join remaining background threads (weather, connection)
+        threads_to_join = [t for t in self._update_threads if t.is_alive()]
+        if threads_to_join:
+            logger.debug(f"Waiting for {len(threads_to_join)} background thread(s) to join...")
+            for thread in threads_to_join:
+                thread.join(timeout=1.0) # Add timeout
+                if thread.is_alive():
+                     logger.warning(f"Thread {thread.name} did not join.")
+            self._update_threads = [] # Clear the list
+
+        # Destroy GUI window if it exists
         if self.app_window:
             logger.info("Destroying GUI window...")
-            # Schedule the destroy call on the Tkinter main thread's event loop
-            # Use after(0, ...) to run it as soon as possible.
             try:
-                self.app_window.after(0, self.app_window.destroy)
+                # No need to schedule with 'after' here, as stop() should be called
+                # after mainloop exits (or during shutdown sequence initiated from main thread)
+                self.app_window.destroy()
             except Exception as e:
-                 logger.error(f"Error scheduling GUI destruction: {e}")
+                 logger.error(f"Error destroying GUI window: {e}")
 
         logger.info("Application stopped.")
 
@@ -186,31 +200,25 @@ class WeatherDisplayApp:
     # --- Background Update Logic ---
 
     def _start_update_threads(self):
-        """Create and start background threads for periodic updates."""
-        logger.info("Starting background update threads...")
+        """Create and start background threads for weather and connection updates."""
+        # Note: Time update is now handled by Tkinter's 'after' loop, not a separate thread.
+        logger.info("Starting background update threads (Weather, Connection)...")
         self._update_threads = [
-            threading.Thread(target=self._time_update_loop, name="TimeUpdateThread", daemon=True),
+            # Removed TimeUpdateThread
             threading.Thread(target=self._weather_update_loop, name="WeatherUpdateThread", daemon=True),
             threading.Thread(target=self._connection_monitoring_loop, name="ConnectionMonitorThread", daemon=True)
         ]
         for thread in self._update_threads:
             thread.start()
-        logger.info("Update threads started.")
+        logger.info("Background update threads started.")
 
-    def _time_update_loop(self):
-        """Background loop to update time/date display periodically."""
-        logger.debug("Time update loop started.")
-        while self.running:
-            self._update_time_and_date()
-            # Use precise sleep interval based on config
-            time.sleep(config.UPDATE_INTERVAL_SECONDS)
-        logger.debug("Time update loop finished.")
+    # Removed _time_update_loop method
 
     def _weather_update_loop(self):
         """Background loop to update weather data periodically."""
         logger.debug("Weather update loop started.")
-        # Perform an initial update immediately
-        self._update_weather()
+        # Initial update is handled by the start() method before the loop begins.
+        # This loop handles subsequent updates after the interval.
         while self.running:
             # Sleep *before* the next update to respect the interval
             interval_seconds = config.WEATHER_UPDATE_INTERVAL_MINUTES * 60
@@ -257,19 +265,33 @@ class WeatherDisplayApp:
     # --- Data Update Actions ---
 
     def _update_time_and_date(self):
-        """Fetch current time/date and update GUI or log if headless."""
+        """Fetch current time/date and update GUI. Schedules the next update."""
+        # This method now runs on the main GUI thread via 'after'
+        if not self.running: # Check if app should stop
+             return
+
         logger.debug("Updating time and date...")
         try:
             time_str, date_str = self.time_service.get_current_datetime()
 
             if self.app_window:
-                # Schedule GUI updates on the main Tkinter thread using after()
-                self.app_window.after(0, lambda ts=time_str: self.app_window.update_time(ts))
-                self.app_window.after(0, lambda ds=date_str: self.app_window.update_date(ds))
-            # No logging needed here for headless, happens too frequently
+                # Directly update GUI elements since we are on the main thread
+                self.app_window.update_time(time_str)
+                self.app_window.update_date(date_str)
+
+                # Schedule the next update
+                # Convert interval to milliseconds for 'after'
+                interval_ms = config.UPDATE_INTERVAL_SECONDS * 1000
+                self._time_update_job_id = self.app_window.after(interval_ms, self._update_time_and_date)
+            # No action needed for headless mode regarding time updates
 
         except Exception as e:
             logger.error(f"Error updating time and date: {e}", exc_info=True)
+            # Optionally schedule retry even on error?
+            if self.app_window and self.running:
+                 interval_ms = config.UPDATE_INTERVAL_SECONDS * 1000
+                 self._time_update_job_id = self.app_window.after(interval_ms, self._update_time_and_date)
+
 
     def _update_weather(self):
         """Fetch weather/forecast data and update GUI or log if headless."""

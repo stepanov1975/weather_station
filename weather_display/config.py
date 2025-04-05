@@ -13,6 +13,7 @@ import os
 APP_TITLE = "Weather Display"
 # Language code for translations: 'en' for English, 'ru' for Russian, etc.
 LANGUAGE = "ru"
+ACCUWEATHER_LANGUAGE = "en-us"  # Language code for AccuWeather API
 APP_WIDTH = 1440  # Initial window width in pixels
 APP_HEIGHT = 810  # Initial window height in pixels
 FULLSCREEN = True  # Run in fullscreen mode if True

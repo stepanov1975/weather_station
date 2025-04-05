@@ -292,6 +292,7 @@ ACCUWEATHER_AQI_CATEGORY_MAP: Dict[str, str] = {
     "Unhealthy": "air_unhealthy",
     "Very Unhealthy": "air_very_unhealthy",
     "Hazardous": "air_hazardous",
+    "Excellent": "air_good", # Added mapping for "Excellent" category
     # Add more mappings here if AccuWeather uses other category names
 }
 
