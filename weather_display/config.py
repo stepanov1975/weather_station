@@ -51,7 +51,7 @@ TIME_FONT_SIZE_BASE = 250  # Base size for time display
 TIME_FONT_SIZE_INCREASE = 40  # Amount added for the large time display
 DATE_FONT_SIZE_BASE = 40  # Base size for date elements (weekday, month/year)
 DATE_DAY_FONT_SIZE_INCREASE = 100  # Amount added for the large day number
-WEATHER_FONT_SIZE = 30  # For current weather titles/values
+WEATHER_FONT_SIZE = 40  # For current weather titles/values
 FORECAST_FONT_SIZE = 35  # For forecast text elements
 STATUS_INDICATOR_FONT_SIZE = 14  # For connection/API status labels
 

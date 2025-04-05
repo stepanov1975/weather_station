@@ -261,17 +261,6 @@ class AppWindow(ctk.CTk):
         self.current_weather_frame.grid_rowconfigure(0, weight=0)  # Title row
         self.current_weather_frame.grid_rowconfigure(1, weight=1)  # Content row
 
-        # Title
-        self.current_weather_title = ctk.CTkLabel(
-            self.current_weather_frame,
-            text=get_translation('current_weather', config.LANGUAGE),
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
-        )
-        self.current_weather_title.grid(
-            row=0, column=0, columnspan=3, sticky="ew",
-            padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y
-        )
-
         # --- Temperature ---
         self.temp_frame = ctk.CTkFrame(self.current_weather_frame)
         self.temp_frame.grid(row=1, column=0, sticky="nsew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
@@ -463,7 +452,7 @@ class AppWindow(ctk.CTk):
         if aqi_category is not None:
             translated_aqi = translate_aqi_category(aqi_category, config.LANGUAGE)
             aqi_index = current_data.get('air_quality_index')
-            display_text = f"{translated_aqi} ({aqi_index})" if aqi_index is not None else translated_aqi
+            display_text = f"{translated_aqi}" if aqi_index is not None else translated_aqi
             self.air_quality_value.configure(text=display_text)
         else:
             self.air_quality_value.configure(text=na_text)
