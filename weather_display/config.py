@@ -1,72 +1,92 @@
 """
 Configuration settings for the Weather Display application.
+
+This module defines constants used throughout the application, such as API keys,
+UI settings, and update intervals. Centralizing configuration makes it easier
+to manage and modify application behavior.
 """
-import os # Moved import to top
+import os
 
-# Application settings
+# ==============================================================================
+# Application Settings
+# ==============================================================================
 APP_TITLE = "Weather Display"
-LANGUAGE = "ru"  # Language code: 'en' for English, 'ru' for Russian
-APP_WIDTH = 1440
-APP_HEIGHT = 810
-FULLSCREEN = True
-UPDATE_INTERVAL_SECONDS = 1  # For time display
-WEATHER_UPDATE_INTERVAL_MINUTES = 60  # For weather data
+# Language code for translations: 'en' for English, 'ru' for Russian, etc.
+LANGUAGE = "ru"
+APP_WIDTH = 1440  # Initial window width in pixels
+APP_HEIGHT = 810  # Initial window height in pixels
+FULLSCREEN = True  # Run in fullscreen mode if True
+# Update interval for the time display (affects clock refresh rate)
+UPDATE_INTERVAL_SECONDS = 1
+# Update interval for fetching new weather data from the API
+WEATHER_UPDATE_INTERVAL_MINUTES = 60
 
-# Location settings
-# Reverted back to City,Country format
+# ==============================================================================
+# Location Settings
+# ==============================================================================
+# Location query string used for the weather API (e.g., "City,Country")
 LOCATION = "Hadera,Israel"
 
-# API settings (AccuWeather)
-# Load API key from environment variable 'ACCUWEATHER_API_KEY', default to None if not found.
-# Can be overridden by the --api-key command-line argument.
+# ==============================================================================
+# API Settings (AccuWeather)
+# ==============================================================================
+# Load API key from environment variable 'ACCUWEATHER_API_KEY'.
+# Defaults to None if the environment variable is not set.
+# Can be overridden by the --api-key command-line argument in main.py.
 ACCUWEATHER_API_KEY = os.environ.get("ACCUWEATHER_API_KEY")
 # Base URL for AccuWeather API endpoints.
 ACCUWEATHER_BASE_URL = "http://dataservice.accuweather.com"
-# WEATHER_API_KEY = ""  # Old key for WeatherAPI.com (commented out)
-# WEATHER_API_URL = "https://api.weatherapi.com/v1" # Old URL for WeatherAPI.com (commented out)
+# Old settings for WeatherAPI.com (commented out for reference)
+# WEATHER_API_KEY = ""
+# WEATHER_API_URL = "https://api.weatherapi.com/v1"
 
-# UI settings
-DARK_MODE = True
-FONT_FAMILY = "Helvetica"
+# ==============================================================================
+# UI Settings
+# ==============================================================================
+DARK_MODE = True  # Use dark theme if True, light theme otherwise
+FONT_FAMILY = "Helvetica"  # Default font family for UI elements
 
-# --- Font Sizes ---
-TIME_FONT_SIZE_BASE = 300 # Base size for time (adjust as needed)
-TIME_FONT_SIZE_INCREASE = 40 # Amount to add for the large time display
-DATE_FONT_SIZE_BASE = 40 # Base size for date elements
-DATE_DAY_FONT_SIZE_INCREASE = 100 # Amount to add for the large day number
-WEATHER_FONT_SIZE = 20  # For current weather titles/values
-FORECAST_FONT_SIZE = 25  # For forecast text
-STATUS_INDICATOR_FONT_SIZE = 14 # For connection/API status
+# --- Font Sizes (in points) ---
+TIME_FONT_SIZE_BASE = 250  # Base size for time display
+TIME_FONT_SIZE_INCREASE = 40  # Amount added for the large time display
+DATE_FONT_SIZE_BASE = 40  # Base size for date elements (weekday, month/year)
+DATE_DAY_FONT_SIZE_INCREASE = 100  # Amount added for the large day number
+WEATHER_FONT_SIZE = 30  # For current weather titles/values
+FORECAST_FONT_SIZE = 35  # For forecast text elements
+STATUS_INDICATOR_FONT_SIZE = 14  # For connection/API status labels
 
-# --- Padding ---
-# General padding between major sections
+# --- Padding (in pixels) ---
+# General padding between major sections (e.g., top/bottom frames)
 SECTION_PADDING_X = 10
 SECTION_PADDING_Y = 10
-# Padding within sections/frames
+# Padding within sections/frames (e.g., around temp/humidity boxes)
 ELEMENT_PADDING_X = 5
 ELEMENT_PADDING_Y = 5
-# Fine-grained padding for text elements
+# Fine-grained padding specifically for text elements within their containers
 TEXT_PADDING_X = 5
 TEXT_PADDING_Y = 2
 
-# --- Sizes ---
-FORECAST_ICON_SIZE = (96, 96)
-CONNECTION_FRAME_HEIGHT = 20
+# --- Sizes (in pixels) ---
+FORECAST_ICON_SIZE = (96, 96)  # (width, height) for forecast icons
+CONNECTION_FRAME_HEIGHT = 10  # Height of the top connection status bar
 
 # --- Colors ---
-# Theme colors (can be overridden by CustomTkinter theme)
-BG_COLOR = "#1E1E1E"
-TEXT_COLOR = "#FFFFFF" # General text color
-ACCENT_COLOR = "#3498DB" # Accent color (e.g., for highlights)
-SECONDARY_BG_COLOR = "#2D2D2D" # Background for sub-frames
+# Theme colors (Note: These might be overridden by CustomTkinter's theme)
+BG_COLOR = "#1E1E1E"  # General background color (if not using theme)
+TEXT_COLOR = "#FFFFFF"  # General text color
+ACCENT_COLOR = "#3498DB"  # Accent color (e.g., for highlights)
+SECONDARY_BG_COLOR = "#2D2D2D"  # Background for sub-frames/elements
 
 # Specific UI element colors
-NO_CONNECTION_COLOR = "#FF5555" # Red for no connection
-API_LIMIT_COLOR = "#FFA500" # Orange for API limit
-STATUS_TEXT_COLOR = "#FFFFFF" # Text color for status indicators
+NO_CONNECTION_COLOR = "#FF5555"  # Background for 'No Connection' indicator
+API_LIMIT_COLOR = "#FFA500"  # Background for 'API Limit' indicator
+STATUS_TEXT_COLOR = "#FFFFFF"  # Text color for status indicators
 
-# --- Corner Radii ---
-STATUS_INDICATOR_CORNER_RADIUS = 5
+# --- Corner Radii (in pixels) ---
+STATUS_INDICATOR_CORNER_RADIUS = 5  # Corner radius for status indicators
 
-# Mock data for testing without API
+# ==============================================================================
+# Mock Data Settings
+# ==============================================================================
+# Use mock data for testing UI without making live API calls
 USE_MOCK_DATA = False

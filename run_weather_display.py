@@ -1,19 +1,30 @@
 #!/usr/bin/env python3
 """
-Entry point script for the Weather Display application.
+Executable entry point script for the Weather Display application.
 
-This script simply imports and calls the main() function from weather_display.main.
-It ensures the package directory is in the Python path.
+This script serves as a simple way to run the application. It imports and
+executes the `main` function from the `weather_display.main` module.
+
+To run the application, execute this script from the project's root directory:
+    python run_weather_display.py [arguments]
+
+Alternatively, run the main module directly:
+    python -m weather_display.main [arguments]
 """
 
-import os
-import sys
+# Standard library imports
+# (No sys.path manipulation needed if run correctly or package installed)
 
-# Ensure the weather_display package can be found
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+# Local application imports
+try:
+    from weather_display.main import main
+except ImportError as e:
+    print(f"Error importing main function: {e}")
+    print("Please ensure the script is run from the project root directory or the package is installed.")
+    import sys
+    sys.exit(1)
 
-# Import and run the main function from the application logic module
-from weather_display.main import main
 
 if __name__ == "__main__":
+    # Call the main function defined in weather_display/main.py
     main()

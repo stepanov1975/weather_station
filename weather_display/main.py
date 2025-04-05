@@ -1,334 +1,435 @@
 #!/usr/bin/env python3
 """
-Weather Display Application for Raspberry Pi 5 touchscreen using AccuWeather API.
+Main entry point for the Weather Display Application.
 
-This application displays the current time, date, and weather information
-(including current conditions, forecast, and AQI) for a configured location.
-It supports running with a GUI or in headless mode for testing.
+This script initializes the application, parses command-line arguments,
+sets up services (Time, Weather API), configures the GUI (if not headless),
+and manages the main update loops in background threads.
 """
 
+# Standard library imports
 import os
 import sys
 import time
 import logging
 import threading
 import argparse
-
-# Add the parent directory to the path so we can import the weather_display package
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from weather_display import config
-from weather_display.gui.app_window import AppWindow
-from weather_display.services.time_service import TimeService
-# Use the new AccuWeather client
-from weather_display.services.weather_api import AccuWeatherClient
-
-logger = logging.getLogger(__name__)
-
-# Import necessary modules for headless mode
 import signal
+from typing import Optional, List # Ensure List is imported
+
+# Local application imports
+# Assuming the script is run from the project root or the package is installed
+try:
+    from weather_display import config
+    from weather_display.gui.app_window import AppWindow
+    from weather_display.services.time_service import TimeService
+    from weather_display.services.weather_api import AccuWeatherClient
+    from weather_display.utils.helpers import check_internet_connection
+except ImportError as e:
+    # Handle cases where the package structure might not be recognized immediately
+    # (e.g., running the script directly without installing the package)
+    print(f"Import Error: {e}. Attempting to adjust Python path.")
+    # Add the parent directory to the path to find the 'weather_display' package
+    parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    if parent_dir not in sys.path:
+        sys.path.insert(0, parent_dir)
+    try:
+        from weather_display import config
+        from weather_display.gui.app_window import AppWindow
+        from weather_display.services.time_service import TimeService
+        from weather_display.services.weather_api import AccuWeatherClient
+        from weather_display.utils.helpers import check_internet_connection
+    except ImportError:
+        print("Failed to import necessary modules even after path adjustment.")
+        print("Please ensure the script is run correctly relative to the package structure or install the package.")
+        sys.exit(1)
+
+
+# --- Global Logger Setup ---
+# Configure logging basic settings here. More advanced config could be in a separate file.
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.StreamHandler(), # Log to console
+        logging.FileHandler('weather_display.log') # Log to file
+    ]
+)
+logger = logging.getLogger(__name__) # Get logger for this module
+
 
 class WeatherDisplayApp:
-    """Main application class for the Weather Display."""
+    """
+    Main application class orchestrating services, GUI, and update loops.
 
-    def __init__(self, api_key=None, headless=False):
+    Attributes:
+        api_key (Optional[str]): AccuWeather API key used by the client.
+        headless (bool): Flag indicating if running without a GUI.
+        running (bool): Flag to control the main loops of background threads.
+        time_service (TimeService): Instance for getting time and date.
+        weather_client (AccuWeatherClient): Instance for fetching weather data.
+        app_window (Optional[AppWindow]): Instance of the GUI window (None if headless).
+        last_connection_status (bool): Tracks the last known internet connection state.
+        _update_threads (List[threading.Thread]): List holding background update threads.
+    """
+
+    def __init__(self, api_key: Optional[str] = None, headless: bool = False):
         """
-        Initialize the Weather Display application.
+        Initialize the Weather Display application services and optionally the GUI.
 
         Args:
-            api_key (str | None): AccuWeather API key. Reads from config if None.
-            headless (bool): Run without GUI if True. Defaults to False.
+            api_key: AccuWeather API key. If None, the client will try config/env.
+            headless: If True, initializes without creating a GUI window.
         """
-        self.api_key = api_key
-        self.headless = headless
-        self.running = False
+        self.api_key: Optional[str] = api_key
+        self.headless: bool = headless
+        self.running: bool = False # Controls thread loops
+        self._update_threads: List[threading.Thread] = []
+
+        # Initialize services
         self.time_service = TimeService()
-        # Instantiate the new client
-        self.weather_client = AccuWeatherClient(api_key=self.api_key)
+        self.weather_client = AccuWeatherClient(api_key=self.api_key) # Pass key explicitly
 
-        # Initialize the GUI only if not headless
-        self.app_window = None
+        # Initialize GUI only if not in headless mode
+        self.app_window: Optional[AppWindow] = None
         if not self.headless:
-            # Import GUI class only when needed
-            from weather_display.gui.app_window import AppWindow
-            self.app_window = AppWindow()
+            logger.info("Initializing GUI...")
+            # Check for display availability before creating window
+            if not os.environ.get('DISPLAY'):
+                 logger.error("No display environment detected (DISPLAY variable not set).")
+                 raise RuntimeError("Cannot initialize GUI without a display environment. Try --headless.")
+            try:
+                self.app_window = AppWindow()
+            except Exception as e:
+                logger.error(f"Failed to initialize AppWindow: {e}", exc_info=True)
+                raise RuntimeError("GUI initialization failed.") from e
         else:
-            logger.info("Running in headless mode.")
+            logger.info("Running in headless mode (no GUI).")
 
-        # Track connection status
-        self.last_connection_status = False
-        
-        logger.info("Weather Display application initialized")
-    
+        # Track connection status for triggering immediate updates on reconnect
+        self.last_connection_status: bool = self.weather_client.connection_status
+
+        logger.info("Weather Display application initialized.")
+
     def start(self):
-        """Start the application with the GUI. Requires a display environment."""
-        if self.headless:
-            logger.error("Cannot start GUI in headless mode. Use run_headless().")
-            return
-
-        if not self.app_window:
-             logger.error("AppWindow not initialized. Cannot start GUI.")
-             return
-
-        self.running = True
-        logger.info("Starting GUI application...")
-
-        # Start the update threads
-        self._start_update_threads()
-        
-        # Initial updates
-        self._update_time_and_date()
-        self._update_weather()
-        
-        # Start the main loop
-        logger.info("Starting Tkinter main loop")
-        self.app_window.mainloop() # This blocks until the window is closed
-
-    def run_headless(self):
-        """
-        Run the application logic without the GUI.
-
-        Starts background threads for updates and logs fetched data.
-        Waits for SIGINT or SIGTERM to stop. Useful for testing or running
-        in environments without a display.
-        """
-        if not self.headless:
-            logger.error("Cannot run headless if not initialized in headless mode.")
+        """Start the application main loop (GUI or headless wait)."""
+        if self.running:
+            logger.warning("Application is already running.")
             return
 
         self.running = True
-        logger.info("Starting headless application...")
+        logger.info("Starting application...")
 
-        # Start update threads
         self._start_update_threads()
 
-        # Keep the main thread alive, waiting for a signal to stop
-        # This allows background threads to run
-        logger.info("Headless mode running. Press Ctrl+C to stop.")
-        signal.signal(signal.SIGINT, self._handle_signal)
-        signal.signal(signal.SIGTERM, self._handle_signal)
+        if self.app_window:
+            logger.info("Starting GUI main loop...")
+            # Perform initial updates before starting loop
+            self._update_time_and_date()
+            self._update_weather()
+            self.app_window.mainloop() # Blocks until window is closed
+            # After mainloop finishes (window closed), stop the app
+            self.stop()
+        elif self.headless:
+            logger.info("Headless mode: Running update loops in background.")
+            logger.info("Press Ctrl+C to stop.")
+            # Setup signal handling for graceful shutdown in headless mode
+            signal.signal(signal.SIGINT, self._handle_signal)
+            signal.signal(signal.SIGTERM, self._handle_signal)
+            # Keep main thread alive while background threads run
+            while self.running:
+                time.sleep(1) # Keep alive, checking running flag
+            logger.info("Headless run finished.")
+        else:
+             # Should not happen if __init__ logic is correct
+             logger.error("Application state invalid: No GUI and not headless.")
 
-        # Wait indefinitely until self.running becomes False
-        while self.running:
-            time.sleep(1)
-
-        logger.info("Headless run finished.")
-
-
-    def _handle_signal(self, signum, frame):
-        """Signal handler for SIGINT and SIGTERM to stop gracefully."""
-        logger.warning(f"Received signal {signum}. Stopping application...")
-        self.stop()
 
     def stop(self):
         """Stop the application, signal threads, and destroy GUI if present."""
+        if not self.running:
+            logger.info("Application already stopped.")
+            return
+
         logger.info("Stopping application...")
-        self.running = False # Signal threads to stop
-        # Wait a moment for threads to potentially finish current work
+        self.running = False # Signal threads to exit their loops
+
+        # Wait briefly for threads to potentially finish current cycle
+        # Adjust sleep time if needed
         time.sleep(0.5)
+
+        # Join threads (optional, ensures they fully exit before proceeding)
+        # for thread in self._update_threads:
+        #     if thread.is_alive():
+        #         logger.debug(f"Waiting for thread {thread.name} to join...")
+        #         thread.join(timeout=1.0) # Add timeout
+        #         if thread.is_alive():
+        #              logger.warning(f"Thread {thread.name} did not join.")
+
+        # Destroy GUI window if it exists (must be done from main thread)
         if self.app_window:
-            # Schedule the window destruction on the main Tkinter thread
-             self.app_window.after(0, self.app_window.destroy)
-        logger.info("Application stopped")
+            logger.info("Destroying GUI window...")
+            # Schedule the destroy call on the Tkinter main thread's event loop
+            # Use after(0, ...) to run it as soon as possible.
+            try:
+                self.app_window.after(0, self.app_window.destroy)
+            except Exception as e:
+                 logger.error(f"Error scheduling GUI destruction: {e}")
+
+        logger.info("Application stopped.")
+
+    def _handle_signal(self, signum, frame):
+        """Signal handler for SIGINT/SIGTERM in headless mode."""
+        logger.warning(f"Received signal {signal.Signals(signum).name}. Initiating shutdown...")
+        self.stop()
+
+    # --- Background Update Logic ---
 
     def _start_update_threads(self):
-        """Start background threads for time, weather, and connection updates."""
-        # Time update thread
-        time_thread = threading.Thread(target=self._time_update_loop, daemon=True)
-        time_thread.start()
-        
-        # Weather update thread
-        weather_thread = threading.Thread(target=self._weather_update_loop, daemon=True)
-        weather_thread.start()
-        
-        # Connection monitoring thread
-        connection_thread = threading.Thread(target=self._connection_monitoring_loop, daemon=True)
-        connection_thread.start()
-        
-        logger.info("Update threads started")
-    
+        """Create and start background threads for periodic updates."""
+        logger.info("Starting background update threads...")
+        self._update_threads = [
+            threading.Thread(target=self._time_update_loop, name="TimeUpdateThread", daemon=True),
+            threading.Thread(target=self._weather_update_loop, name="WeatherUpdateThread", daemon=True),
+            threading.Thread(target=self._connection_monitoring_loop, name="ConnectionMonitorThread", daemon=True)
+        ]
+        for thread in self._update_threads:
+            thread.start()
+        logger.info("Update threads started.")
+
     def _time_update_loop(self):
-        """Background loop to update time/date periodically."""
+        """Background loop to update time/date display periodically."""
+        logger.debug("Time update loop started.")
         while self.running:
             self._update_time_and_date()
+            # Use precise sleep interval based on config
             time.sleep(config.UPDATE_INTERVAL_SECONDS)
-    
-    def _connection_monitoring_loop(self):
-        """Background loop to monitor internet connection status."""
-        while self.running:
-            # Get current connection status
-            current_status = self.weather_client.connection_status
-            
-            # If connection was down but is now up, update weather immediately
-            if not self.last_connection_status and current_status:
-                logger.info("Internet connection restored. Updating weather data immediately.")
-                self._update_weather()
-            # Connection status is now updated via _update_weather calls which have api_status info.
-            # We only log the change here in headless mode.
-            if not self.app_window and self.last_connection_status != current_status: # Log change in headless
-                 logger.info(f"Connection status changed: {'Connected' if current_status else 'Disconnected'}")
+        logger.debug("Time update loop finished.")
 
-            # Store current status for next check
-            self.last_connection_status = current_status
-            
-            # Wait 30 seconds before checking again
-            time.sleep(30)
-    
     def _weather_update_loop(self):
         """Background loop to update weather data periodically."""
+        logger.debug("Weather update loop started.")
+        # Perform an initial update immediately
+        self._update_weather()
         while self.running:
+            # Sleep *before* the next update to respect the interval
+            interval_seconds = config.WEATHER_UPDATE_INTERVAL_MINUTES * 60
+            # Allow loop to exit quickly if self.running becomes False during sleep
+            for _ in range(int(interval_seconds)):
+                 if not self.running: break
+                 time.sleep(1)
+            if not self.running: break # Exit if stopped during sleep
             self._update_weather()
-            # Sleep for the configured interval (convert minutes to seconds)
-            time.sleep(config.WEATHER_UPDATE_INTERVAL_MINUTES * 60)
-    
+        logger.debug("Weather update loop finished.")
+
+    def _connection_monitoring_loop(self):
+        """Background loop to monitor internet connection status."""
+        logger.debug("Connection monitoring loop started.")
+        check_interval_seconds = 30 # Check connection every 30 seconds
+        while self.running:
+            current_status = self.weather_client.connection_status
+
+            # If connection restored, trigger immediate weather update
+            if not self.last_connection_status and current_status:
+                logger.info("Internet connection restored. Triggering immediate weather update.")
+                # Run weather update in a separate thread to avoid blocking this loop
+                update_thread = threading.Thread(target=self._update_weather, daemon=True)
+                update_thread.start()
+
+            # Log status change only if it actually changed
+            if self.last_connection_status != current_status:
+                 log_msg = f"Connection status changed: {'Connected' if current_status else 'Disconnected'}"
+                 # Log differently based on mode (GUI updates indicators, headless needs log)
+                 if self.headless:
+                     logger.info(log_msg)
+                 else:
+                     logger.debug(log_msg + " (GUI indicators will update)")
+
+            self.last_connection_status = current_status
+
+            # Sleep until next check, allowing quick exit if stopped
+            for _ in range(check_interval_seconds):
+                 if not self.running: break
+                 time.sleep(1)
+            if not self.running: break # Exit if stopped during sleep
+        logger.debug("Connection monitoring loop finished.")
+
+    # --- Data Update Actions ---
+
     def _update_time_and_date(self):
         """Fetch current time/date and update GUI or log if headless."""
+        logger.debug("Updating time and date...")
         try:
             time_str, date_str = self.time_service.get_current_datetime()
 
             if self.app_window:
-                # Update the GUI (must be done in the main thread)
+                # Schedule GUI updates on the main Tkinter thread using after()
                 self.app_window.after(0, lambda ts=time_str: self.app_window.update_time(ts))
                 self.app_window.after(0, lambda ds=date_str: self.app_window.update_date(ds))
-            elif self.headless:
-                 # Log time/date in headless mode (optional)
-                 # logger.debug(f"Time: {time_str}, Date: {date_str}")
-                 pass # Avoid excessive logging unless needed
+            # No logging needed here for headless, happens too frequently
 
         except Exception as e:
-            logger.error(f"Error updating time and date: {e}")
-    
+            logger.error(f"Error updating time and date: {e}", exc_info=True)
+
     def _update_weather(self):
-        """Fetch current weather/forecast and update GUI or log if headless."""
+        """Fetch weather/forecast data and update GUI or log if headless."""
+        logger.info("Attempting to update weather data...")
         try:
-            # Get current weather
-            current_weather = self.weather_client.get_current_weather()
+            # Fetch both current weather and forecast
+            # The API client handles caching internally
+            current_weather_result = self.weather_client.get_current_weather()
+            forecast_result = self.weather_client.get_forecast(days=3) # Request 3 days for display
 
-            # Get forecast (Request 3 days, API client fetches 5 but returns all)
-            forecast = self.weather_client.get_forecast(days=3)
-
+            # Update GUI if it exists
             if self.app_window:
-                # Update the GUI (must be done in the main thread)
-                # Use arguments directly in lambda to capture current value
-                self.app_window.after(0, lambda cw=current_weather: self.app_window.update_current_weather(cw))
-                self.app_window.after(0, lambda fc=forecast: self.app_window.update_forecast(fc))
+                # Schedule GUI updates on the main Tkinter thread
+                # Pass copies of the data to the lambda to capture current state
+                self.app_window.after(0, lambda cw=current_weather_result.copy(): self.app_window.update_current_weather(cw))
+                self.app_window.after(0, lambda fc=forecast_result.copy(): self.app_window.update_forecast(fc))
             elif self.headless:
-                 # Log fetched data in headless mode
-                 logger.info(f"Headless Weather Update: Current={current_weather}, Forecast={forecast}")
+                 # Log fetched data details in headless mode
+                 logger.info(f"Headless Weather Update:")
+                 logger.info(f"  Current: {current_weather_result.get('data', {})}")
+                 logger.info(f"  Forecast: {forecast_result.get('data', [])}")
+                 logger.info(f"  API Status (Current): {current_weather_result.get('api_status', 'unknown')}")
+                 logger.info(f"  API Status (Forecast): {forecast_result.get('api_status', 'unknown')}")
 
+            # Update internal connection status tracker based on current weather fetch
+            # This helps the connection monitor log changes accurately in headless mode
+            conn_status = current_weather_result.get('connection_status', False)
+            if self.last_connection_status != conn_status:
+                 logger.debug(f"Connection status updated to: {'Connected' if conn_status else 'Disconnected'}")
+                 self.last_connection_status = conn_status
 
-            # Log connection status change if not using GUI
-            conn_status = current_weather.get('connection_status', False)
-            if not self.app_window and self.last_connection_status != conn_status:
-                 logger.info(f"Connection status: {'Connected' if conn_status else 'Disconnected'}")
-                 self.last_connection_status = conn_status # Update status if logged here
+            logger.info("Weather data update cycle finished.")
 
-            logger.info("Weather data updated")
         except Exception as e:
-            logger.error(f"Error updating weather: {e}")
-            # If there's an exception, update status indicators accordingly
-            # Assume connection might be down or another error occurred
+            logger.error(f"Unexpected error during weather update cycle: {e}", exc_info=True)
+            # Attempt to update status indicators in GUI to show error state
             if self.app_window:
-                # Pass False for connection and 'error' for api_status
+                # Assume connection failed or other error occurred
                 self.app_window.after(0, lambda: self.app_window.update_status_indicators(False, 'error'))
-            elif self.last_connection_status: # Log change in headless
-                 logger.warning("Connection status changed: Disconnected (due to error)")
+            # Update internal status if possible
+            if self.last_connection_status:
+                 logger.warning("Connection status changed: Disconnected (due to update error)")
                  self.last_connection_status = False
 
 
-def parse_arguments():
-    """Parse command line arguments."""
-    parser = argparse.ArgumentParser(description='Weather Display for Raspberry Pi')
-    # Update help text for API key
-    parser.add_argument('--api-key', help='AccuWeather API key')
-    parser.add_argument('--mock', action='store_true', help='Use mock data instead of API')
-    parser.add_argument('--windowed', action='store_true', help='Run in windowed mode instead of fullscreen.')
-    # Add headless argument for testing without GUI
-    parser.add_argument('--headless', action='store_true', help='Run without GUI (logs data to console/file).')
+# --- Command Line Argument Parsing ---
+
+def parse_arguments() -> argparse.Namespace:
+    """Parse command line arguments for the application."""
+    parser = argparse.ArgumentParser(description='Weather Display Application')
+    parser.add_argument(
+        '--api-key',
+        help='AccuWeather API key (overrides environment variable/config)'
+    )
+    parser.add_argument(
+        '--mock',
+        action='store_true',
+        help='Use mock data instead of live API calls'
+    )
+    parser.add_argument(
+        '--windowed',
+        action='store_true',
+        help='Run in windowed mode (overrides FULLSCREEN config)'
+    )
+    parser.add_argument(
+        '--headless',
+        action='store_true',
+        help='Run without GUI (logs data to console/file)'
+    )
     return parser.parse_args()
 
 
-def wait_for_internet_connection():
+# --- Main Execution ---
+
+def wait_for_internet(max_wait_seconds: int = 60, check_interval: int = 5) -> bool:
     """
-    Wait for internet connection, checking every 10 seconds.
-    
+    Wait for internet connection for a maximum duration.
+
+    Args:
+        max_wait_seconds: Maximum time to wait in seconds.
+        check_interval: How often to check the connection in seconds.
+
     Returns:
-        bool: True when connection is established
+        True if connection is established within the time limit, False otherwise.
     """
-    from weather_display.utils.helpers import check_internet_connection
-    
-    while True:
+    start_time = time.time()
+    logger.info("Waiting for internet connection...")
+    while time.time() - start_time < max_wait_seconds:
         if check_internet_connection():
-            logger.info("Internet connection established")
+            logger.info("Internet connection established.")
             return True
-        
-        logger.info("No internet connection. Waiting 10 seconds before checking again...")
-        time.sleep(10)
+        logger.info(f"No connection. Retrying in {check_interval} seconds...")
+        time.sleep(check_interval)
+    logger.error(f"No internet connection after {max_wait_seconds} seconds.")
+    return False
 
 def main():
-    """Main entry point."""
-    # Parse command line arguments
+    """Main entry point: parses args, configures, creates, and starts the app."""
     args = parse_arguments()
-    
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(),
-            logging.FileHandler('weather_display.log')
-        ]
-    )
-    
-    # Override config settings from command line arguments
-    if args.api_key:
-        # Use the correct config variable
-        config.ACCUWEATHER_API_KEY = args.api_key
 
+    # --- Configuration Override ---
+    # Apply command-line arguments to override config settings
+    if args.api_key:
+        logger.info("Overriding API key from command line argument.")
+        config.ACCUWEATHER_API_KEY = args.api_key
     if args.mock:
+        logger.info("Enabling mock data mode via command line argument.")
         config.USE_MOCK_DATA = True
-    
     if args.windowed:
+        logger.info("Disabling fullscreen mode via command line argument.")
         config.FULLSCREEN = False
-    
-    # Wait for internet connection before starting the application
-    # Skip waiting if using mock data
+
+    # --- Pre-run Checks ---
     # Check for API key if not using mock data
     if not config.USE_MOCK_DATA and not config.ACCUWEATHER_API_KEY:
-        logger.critical("AccuWeather API key is missing!")
-        logger.critical("Please set the ACCUWEATHER_API_KEY environment variable or use the --api-key argument.")
-        logger.critical("Alternatively, run with --mock to use mock data.")
-        sys.exit(1) # Exit if key is missing and mock is not enabled
+        logger.critical(
+            "AccuWeather API key is missing and mock data is disabled. "
+            "Set ACCUWEATHER_API_KEY environment variable or use --api-key. "
+            "Alternatively, run with --mock."
+        )
+        sys.exit(1)
 
-    # Log the location value from config before using it
-    logger.info(f"Using location from config: '{config.LOCATION}'")
-
-    # Wait for internet connection before starting the application
-    # Skip waiting if using mock data
+    # Wait for internet connection if not using mock data
     if not config.USE_MOCK_DATA:
-        logger.info("Checking for internet connection...")
-        wait_for_internet_connection()
+        if not wait_for_internet():
+            logger.critical("Exiting due to lack of internet connection.")
+            sys.exit(1)
 
-    # Create the application instance, passing the headless flag
-    app = WeatherDisplayApp(api_key=config.ACCUWEATHER_API_KEY, headless=args.headless)
-
+    # --- Application Initialization and Start ---
+    app: Optional[WeatherDisplayApp] = None
     try:
-        # Start the appropriate run method based on the headless flag
-        if args.headless:
-            app.run_headless()
-        else:
-            # Check for display availability before starting GUI
-            if not os.environ.get('DISPLAY'):
-                 logger.error("No display environment detected. Cannot start GUI.")
-                 logger.error("Try running with --headless for non-GUI operation.")
-                 sys.exit(1)
-            app.start()
+        logger.info(f"Using location: '{config.LOCATION}'")
+        logger.info(f"Headless mode: {args.headless}")
+        logger.info(f"Mock data mode: {config.USE_MOCK_DATA}")
+
+        app = WeatherDisplayApp(
+            api_key=config.ACCUWEATHER_API_KEY, # Pass configured key
+            headless=args.headless
+        )
+        app.start() # Starts GUI mainloop or headless wait loop
+
+    except RuntimeError as e:
+         # Catch specific errors like missing display during init
+         logger.critical(f"Application initialization failed: {e}")
+         sys.exit(1)
     except KeyboardInterrupt:
-        logger.info("Keyboard interrupt received. Stopping...")
+        logger.info("Keyboard interrupt received. Stopping application...")
+        if app:
+            app.stop()
     except Exception as e:
-        logger.error(f"Error in main: {e}")
+        logger.critical(f"An unexpected error occurred in main: {e}", exc_info=True)
+        if app:
+            app.stop() # Attempt graceful shutdown
+        sys.exit(1)
     finally:
-        app.stop()
+        # Ensure stop is called even if mainloop/headless loop exits unexpectedly
+        if app and app.running:
+            logger.warning("Main loop exited unexpectedly. Ensuring application stops.")
+            app.stop()
+        logger.info("Application shutdown complete.")
 
 
 if __name__ == "__main__":
