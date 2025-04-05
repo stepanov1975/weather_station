@@ -57,8 +57,8 @@ STATUS_INDICATOR_FONT_SIZE = 14  # For connection/API status labels
 
 # --- Padding (in pixels) ---
 # General padding between major sections (e.g., top/bottom frames)
-SECTION_PADDING_X = 10
-SECTION_PADDING_Y = 10
+SECTION_PADDING_X = 5
+SECTION_PADDING_Y = 5
 # Padding within sections/frames (e.g., around temp/humidity boxes)
 ELEMENT_PADDING_X = 5
 ELEMENT_PADDING_Y = 5
@@ -80,6 +80,7 @@ SECONDARY_BG_COLOR = "#2D2D2D"  # Background for sub-frames/elements
 # Specific UI element colors
 NO_CONNECTION_COLOR = "#FF5555"  # Background for 'No Connection' indicator
 API_LIMIT_COLOR = "#FFA500"  # Background for 'API Limit' indicator
+API_ERROR_COLOR = "#FF0000"  # Background for 'API Error' indicator (e.g., red)
 STATUS_TEXT_COLOR = "#FFFFFF"  # Text color for status indicators
 
 # --- Corner Radii (in pixels) ---
