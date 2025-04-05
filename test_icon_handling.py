@@ -1,60 +1,121 @@
 #!/usr/bin/env python3
 """
-Test script to verify the icon handling logic in the weather display application.
+Tests for the WeatherIconHandler class.
+
+This script tests the functionality of the WeatherIconHandler class:
+- Getting icon paths based on AccuWeather codes
+- Getting icons based on condition text
+- Downloading icons
 """
 
 import os
 import sys
-from weather_display.utils.helpers import download_image
+import logging
+import unittest
+from unittest.mock import patch, MagicMock
 
-def test_icon_handling():
-    """Test the icon handling logic."""
-    # Create the icons directory if it doesn't exist
-    os.makedirs('weather_display/assets/icons', exist_ok=True)
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
+
+# Add the project root to Python path to allow importing from weather_display
+project_root = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, project_root)
+
+# Import our icon handler
+from weather_display.utils.icon_handler import WeatherIconHandler
+
+class TestWeatherIconHandler(unittest.TestCase):
+    """Test cases for the WeatherIconHandler class."""
     
-    # Test URLs
-    day_icon_url = '//cdn.weatherapi.com/weather/64x64/day/113.png'  # Sunny day
-    night_icon_url = '//cdn.weatherapi.com/weather/64x64/night/113.png'  # Clear night
+    def setUp(self):
+        """Set up test fixtures."""
+        self.icon_handler = WeatherIconHandler()
     
-    # Download the icons
-    print(f"Downloading day icon: {day_icon_url}")
-    day_icon_path = download_image(day_icon_url, 'weather_display/assets/icons')
-    print(f"Downloaded to: {day_icon_path}")
+    def test_get_icon_path(self):
+        """Test getting an icon path from a code."""
+        # Test a valid icon code
+        path = self.icon_handler.get_icon_path(1)  # Sunny
+        self.assertIsNotNone(path)
+        self.assertTrue(os.path.exists(path) or path.endswith("01_sunny.png"))
+        
+        # Test getting an icon path with a nonexistent code
+        with patch('logging.Logger.warning') as mock_warning:
+            path = self.icon_handler.get_icon_path(999)  # Invalid code
+            mock_warning.assert_called_once()
     
-    print(f"Downloading night icon: {night_icon_url}")
-    night_icon_path = download_image(night_icon_url, 'weather_display/assets/icons')
-    print(f"Downloaded to: {night_icon_path}")
+    def test_get_icon_by_condition(self):
+        """Test getting an icon path from a condition text."""
+        # Test exact match
+        path = self.icon_handler.get_icon_by_condition("Sunny")
+        self.assertIsNotNone(path)
+        self.assertTrue(os.path.exists(path) or path.endswith("01_sunny.png"))
+        
+        # Test case-insensitive match
+        path = self.icon_handler.get_icon_by_condition("sunny")
+        self.assertIsNotNone(path)
+        self.assertTrue(os.path.exists(path) or path.endswith("01_sunny.png"))
+        
+        # Test partial match
+        path = self.icon_handler.get_icon_by_condition("Cloudy with some Showers")
+        self.assertIsNotNone(path)
+        
+        # Test nonexistent condition
+        with patch('logging.Logger.warning') as mock_warning:
+            path = self.icon_handler.get_icon_by_condition("Not a real weather condition")
+            mock_warning.assert_called_once()
     
-    # List the icons directory
-    print("\nContents of icons directory:")
-    for filename in os.listdir('weather_display/assets/icons'):
-        if filename.endswith('.png'):
-            print(f"  {filename}")
+    @patch('requests.get')
+    def test_download_icon(self, mock_get):
+        """Test downloading an icon."""
+        # Mock the requests.get response
+        mock_response = MagicMock()
+        mock_response.raise_for_status.return_value = None
+        # Create a simple file-like object for the mock response content
+        mock_response.iter_content.return_value = [b'test_image_content']
+        mock_get.return_value = mock_response
+        
+        # Test downloading an icon
+        with patch('builtins.open', unittest.mock.mock_open()) as mock_file:
+            result = self.icon_handler._download_icon(1, "test_path.png")
+            self.assertTrue(result)
+            mock_file.assert_called_once_with("test_path.png", 'wb')
     
-    # Verify the icon filenames
-    expected_day_filename = 'day_113.png'
-    expected_night_filename = 'night_113.png'
+    def test_download_all_icons(self):
+        """Test downloading all icons."""
+        # Mock the _download_icon method to avoid actual downloads
+        with patch.object(self.icon_handler, '_download_icon') as mock_download:
+            mock_download.return_value = True
+            count = self.icon_handler.download_all_icons()
+            # Should call _download_icon for each icon in ICON_MAPPING
+            self.assertEqual(count, len(mock_download.call_args_list))
     
-    day_icon_exists = os.path.exists(os.path.join('weather_display/assets/icons', expected_day_filename))
-    night_icon_exists = os.path.exists(os.path.join('weather_display/assets/icons', expected_night_filename))
-    
-    print(f"\nDay icon '{expected_day_filename}' exists: {day_icon_exists}")
-    print(f"Night icon '{expected_night_filename}' exists: {night_icon_exists}")
-    
-    if day_icon_exists and night_icon_exists:
-        print("\nSUCCESS: Both day and night icons were downloaded with the correct filenames.")
-        return True
-    else:
-        print("\nFAILURE: One or both icons were not downloaded with the correct filenames.")
-        return False
+    def test_load_icon(self):
+        """Test loading an icon as a CTkImage."""
+        # This test requires CustomTkinter and PIL, so we'll just
+        # mock the dependencies to avoid test failures
+        with patch('customtkinter.CTkImage') as mock_ctk_image, \
+             patch('PIL.Image.open') as mock_pil_open, \
+             patch.object(self.icon_handler, 'get_icon_path') as mock_get_path, \
+             patch('os.path.exists') as mock_exists:
+            
+            # Set up our mocks
+            mock_get_path.return_value = "fake_path.png"
+            mock_exists.return_value = True  # Mock that the file exists
+            mock_pil_open.return_value = "fake_pil_image"
+            mock_ctk_image.return_value = "fake_ctk_image"
+            
+            # Test loading an icon
+            icon = self.icon_handler.load_icon(1)
+            self.assertEqual(icon, "fake_ctk_image")
+            mock_get_path.assert_called_once_with(1)
+            
+            # Test cache works
+            self.icon_handler.load_icon(1)  # Should use cache
+            mock_get_path.assert_called_once()  # Should not call again
 
 if __name__ == "__main__":
-    # Activate the virtual environment
-    activate_script = os.path.join('weather_venv', 'bin', 'activate_this.py')
-    if os.path.exists(activate_script):
-        with open(activate_script) as f:
-            exec(f.read(), {'__file__': activate_script})
-    
-    # Run the test
-    success = test_icon_handling()
-    sys.exit(0 if success else 1)
+    unittest.main()
