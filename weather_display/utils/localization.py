@@ -309,14 +309,23 @@ def translate_aqi_category(category: Optional[str], language: str = 'en') -> str
 
     Returns:
         The translated AQI category string, or a localized "Unknown AQI" string
-        if the category is None or not found in the map.
+        if the category is None, or the original category string if it's not
+        found in the mapping.
     """
     if category is None:
+        # If the input category itself is None, return the translation for 'unknown'
         return get_translation('air_unknown', language)
 
     # Find the translation key corresponding to the API category string
-    translation_key = ACCUWEATHER_AQI_CATEGORY_MAP.get(category, 'air_unknown')
-    return get_translation(translation_key, language)
+    translation_key = ACCUWEATHER_AQI_CATEGORY_MAP.get(category)
+
+    if translation_key:
+        # If a mapping exists, return the translation for that key
+        return get_translation(translation_key, language)
+    else:
+        # If no mapping exists for the category, return the original category string
+        logger.warning(f"No translation mapping found for AQI category: '{category}'. Returning original.")
+        return category
 
 # --- Weather Conditions ---
 
