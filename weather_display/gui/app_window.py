@@ -76,25 +76,28 @@ class AppWindow(ctk.CTk):
         self.grid_rowconfigure(0, weight=0)  # Connection status frame
         self.grid_rowconfigure(1, weight=1)  # Top frame
         self.grid_rowconfigure(2, weight=1)  # Bottom frame
-        
+
         # Create frames
-        self.connection_frame = ctk.CTkFrame(self, corner_radius=0, height=30)
+        self.connection_frame = ctk.CTkFrame(self, corner_radius=0, height=config.CONNECTION_FRAME_HEIGHT) # Use config
         self.connection_frame.grid(row=0, column=0, sticky="ew")
         self.connection_frame.grid_columnconfigure(0, weight=1)
         self.connection_frame.grid_propagate(False)  # Prevent frame from resizing to fit content
         
         self.top_frame = ctk.CTkFrame(self, corner_radius=0)
         self.top_frame.grid(row=1, column=0, sticky="nsew")
-        
+
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=0)
         self.bottom_frame.grid(row=2, column=0, sticky="nsew")
-        
+
         # Configure frame grid layout
-        self.top_frame.grid_columnconfigure(0, weight=1)
-        self.top_frame.grid_rowconfigure(0, weight=1)  # Time
-        self.top_frame.grid_rowconfigure(1, weight=1)  # Date
-        self.top_frame.grid_rowconfigure(2, weight=2)  # Current weather
-        
+        # Top frame: 2/3 for time (col 0), 1/3 for date (col 1)
+        self.top_frame.grid_columnconfigure(0, weight=2)
+        self.top_frame.grid_columnconfigure(1, weight=1)
+        # Set weight=1 for row 0 to allow vertical expansion for centering
+        self.top_frame.grid_rowconfigure(0, weight=1)
+        self.top_frame.grid_rowconfigure(1, weight=2)  # Row for Current weather
+
+        # Bottom frame for forecast
         self.bottom_frame.grid_columnconfigure((0, 1, 2), weight=1)
         self.bottom_frame.grid_rowconfigure(0, weight=1)
         
@@ -112,47 +115,81 @@ class AppWindow(ctk.CTk):
         self.connection_indicator = ctk.CTkLabel(
             self.connection_frame,
             text=get_translation('no_internet', config.LANGUAGE),
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=14),
-            fg_color="#FF5555",  # Red background for no connection
-            text_color="#FFFFFF",  # White text
-            corner_radius=5
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.STATUS_INDICATOR_FONT_SIZE), # Use config
+            fg_color=config.NO_CONNECTION_COLOR,  # Use config
+            text_color=config.STATUS_TEXT_COLOR,  # Use config
+            corner_radius=config.STATUS_INDICATOR_CORNER_RADIUS # Use config
         )
-        self.connection_indicator.grid(row=0, column=0, sticky="e", padx=(10, 5), pady=5)
+        # Use config padding
+        self.connection_indicator.grid(row=0, column=0, sticky="e", padx=(config.ELEMENT_PADDING_X * 2, config.ELEMENT_PADDING_X), pady=config.ELEMENT_PADDING_Y)
         self.connection_indicator.grid_remove()  # Hide by default
 
         # API Limit status indicator
         self.api_limit_indicator = ctk.CTkLabel(
             self.connection_frame,
             text=get_translation('api_limit_reached', config.LANGUAGE), # Need to add this translation
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=14),
-            fg_color="#FFA500",  # Orange background for API limit
-            text_color="#FFFFFF",  # White text
-            corner_radius=5
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.STATUS_INDICATOR_FONT_SIZE), # Use config
+            fg_color=config.API_LIMIT_COLOR,  # Use config
+            text_color=config.STATUS_TEXT_COLOR,  # Use config
+            corner_radius=config.STATUS_INDICATOR_CORNER_RADIUS # Use config
         )
-        self.api_limit_indicator.grid(row=0, column=1, sticky="e", padx=(5, 10), pady=5)
+        # Use config padding
+        self.api_limit_indicator.grid(row=0, column=1, sticky="e", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
         self.api_limit_indicator.grid_remove() # Hide by default
 
-        # Time display
+        # --- Time Display (Left 2/3) ---
+        # Place time label directly in top_frame
         self.time_label = ctk.CTkLabel(
-            self.top_frame,
-            text="00:00:00",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.TIME_FONT_SIZE, weight="bold")
+            self.top_frame, # Parent is now top_frame
+            text="00:00", # Format changed
+            # Use config font sizes
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.TIME_FONT_SIZE_BASE + config.TIME_FONT_SIZE_INCREASE, weight="bold")
         )
-        self.time_label.grid(row=0, column=0, sticky="s", padx=20, pady=(20, 0))
-        
-        # Date display
-        self.date_label = ctk.CTkLabel(
-            self.top_frame,
-            text="Day, 00 Month 0000",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.DATE_FONT_SIZE)
+        # Center the label widget itself within the grid cell (0,0) - Use config padding
+        self.time_label.grid(row=0, column=0, sticky="", padx=(config.SECTION_PADDING_X, config.ELEMENT_PADDING_X), pady=config.SECTION_PADDING_Y)
+
+        # --- Date Display Frame (Right 1/3) ---
+        # Keep this frame for vertical stacking of date components
+        self.date_display_frame = ctk.CTkFrame(self.top_frame, fg_color="transparent")
+        # Make frame fill vertically in its cell - Use config padding
+        self.date_display_frame.grid(row=0, column=1, sticky="ns", padx=(config.ELEMENT_PADDING_X, config.SECTION_PADDING_X), pady=config.SECTION_PADDING_Y)
+        self.date_display_frame.grid_columnconfigure(0, weight=1)
+        # Configure rows for vertical stacking and centering
+        self.date_display_frame.grid_rowconfigure(0, weight=1) # Weekday
+        self.date_display_frame.grid_rowconfigure(1, weight=2) # Day (larger)
+        self.date_display_frame.grid_rowconfigure(2, weight=1) # Month Year
+
+        # Weekday Label
+        self.weekday_label = ctk.CTkLabel(
+            self.date_display_frame,
+            text="Weekday",
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.DATE_FONT_SIZE_BASE) # Use config
         )
-        self.date_label.grid(row=1, column=0, sticky="n", padx=20, pady=(0, 20))
-        
-        # Current weather frame
+        self.weekday_label.grid(row=0, column=0, sticky="s", pady=(0, config.TEXT_PADDING_Y)) # Use config padding
+
+        # Day Label (Large)
+        self.day_label = ctk.CTkLabel(
+            self.date_display_frame,
+            text="00",
+            # Use config font sizes
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.DATE_FONT_SIZE_BASE + config.DATE_DAY_FONT_SIZE_INCREASE, weight="bold")
+        )
+        self.day_label.grid(row=1, column=0, sticky="", pady=0) # Centered
+
+        # Month Year Label
+        self.month_year_label = ctk.CTkLabel(
+            self.date_display_frame,
+            text="Month 0000",
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.DATE_FONT_SIZE_BASE) # Use config
+        )
+        self.month_year_label.grid(row=2, column=0, sticky="n", pady=(config.TEXT_PADDING_Y, 0)) # Use config padding
+
+        # --- Current Weather Frame (Below Time/Date) ---
         self.current_weather_frame = ctk.CTkFrame(self.top_frame)
-        self.current_weather_frame.grid(row=2, column=0, sticky="nsew", padx=20, pady=20)
-        
-        # Configure current weather frame
+        # Place in row 1, spanning both columns - Use config padding
+        self.current_weather_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=config.SECTION_PADDING_X, pady=config.SECTION_PADDING_Y)
+
+        # Configure current weather frame grid
         self.current_weather_frame.grid_columnconfigure((0, 1, 2), weight=1)
         self.current_weather_frame.grid_rowconfigure(0, weight=0)  # Title
         self.current_weather_frame.grid_rowconfigure(1, weight=1)  # Content
@@ -161,79 +198,93 @@ class AppWindow(ctk.CTk):
         self.current_weather_title = ctk.CTkLabel(
             self.current_weather_frame,
             text=get_translation('current_weather', config.LANGUAGE),
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold") # Use config
         )
-        self.current_weather_title.grid(row=0, column=0, columnspan=3, sticky="ew", padx=10, pady=10)
-        
+        # Use config padding
+        self.current_weather_title.grid(row=0, column=0, columnspan=3, sticky="ew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         # Temperature frame
         self.temp_frame = ctk.CTkFrame(self.current_weather_frame)
-        self.temp_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
-        
+        # Use config padding
+        self.temp_frame.grid(row=1, column=0, sticky="nsew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         self.temp_frame.grid_rowconfigure(0, weight=0)  # Title
         self.temp_frame.grid_rowconfigure(1, weight=1)  # Value
         
         self.temp_title = ctk.CTkLabel(
             self.temp_frame,
             text=get_translation('temperature', config.LANGUAGE),
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold") # Use config
         )
-        self.temp_title.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
-        
+        # Use config padding
+        self.temp_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
+
         self.temp_value = ctk.CTkLabel(
             self.temp_frame,
             text="--°C",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE+16, weight="bold")
+            # Use config font size (adjust if needed, maybe WEATHER_FONT_SIZE + 10?)
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 10, weight="bold")
         )
-        self.temp_value.grid(row=1, column=0, sticky="n", padx=10, pady=10)
-        
+        # Use config padding
+        self.temp_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         # Humidity frame
         self.humidity_frame = ctk.CTkFrame(self.current_weather_frame)
-        self.humidity_frame.grid(row=1, column=1, sticky="nsew", padx=10, pady=10)
-        
+        # Use config padding
+        self.humidity_frame.grid(row=1, column=1, sticky="nsew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         self.humidity_frame.grid_rowconfigure(0, weight=0)  # Title
         self.humidity_frame.grid_rowconfigure(1, weight=1)  # Value
         
         self.humidity_title = ctk.CTkLabel(
             self.humidity_frame,
             text=get_translation('humidity', config.LANGUAGE),
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold") # Use config
         )
-        self.humidity_title.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
-        
+        # Use config padding
+        self.humidity_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
+
         self.humidity_value = ctk.CTkLabel(
             self.humidity_frame,
             text="--%",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE+16, weight="bold")
+            # Use config font size (adjust if needed)
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 10, weight="bold")
         )
-        self.humidity_value.grid(row=1, column=0, sticky="n", padx=10, pady=10)
-        
+        # Use config padding
+        self.humidity_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         # Air Quality frame
         self.air_quality_frame = ctk.CTkFrame(self.current_weather_frame)
-        self.air_quality_frame.grid(row=1, column=2, sticky="nsew", padx=10, pady=10)
-        
+        # Use config padding
+        self.air_quality_frame.grid(row=1, column=2, sticky="nsew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         self.air_quality_frame.grid_rowconfigure(0, weight=0)  # Title
         self.air_quality_frame.grid_rowconfigure(1, weight=1)  # Value
         
         self.air_quality_title = ctk.CTkLabel(
             self.air_quality_frame,
             text=get_translation('air_quality', config.LANGUAGE),
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold") # Use config
         )
-        self.air_quality_title.grid(row=0, column=0, sticky="ew", padx=10, pady=5)
-        
+        # Use config padding
+        self.air_quality_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
+
         self.air_quality_value = ctk.CTkLabel(
             self.air_quality_frame,
             text="--",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE+16, weight="bold")
+            # Use config font size (adjust if needed)
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 10, weight="bold")
         )
-        self.air_quality_value.grid(row=1, column=0, sticky="n", padx=10, pady=10)
-        
+        # Use config padding
+        self.air_quality_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
         # Forecast frames
         self.forecast_frames = []
         for i in range(3):
             forecast_frame = ctk.CTkFrame(self.bottom_frame)
-            forecast_frame.grid(row=0, column=i, sticky="nsew", padx=20, pady=20)
-            
+            # Use config padding
+            forecast_frame.grid(row=0, column=i, sticky="nsew", padx=config.SECTION_PADDING_X, pady=config.SECTION_PADDING_Y)
+
             forecast_frame.grid_rowconfigure(0, weight=0)  # Day
             forecast_frame.grid_rowconfigure(1, weight=1)  # Icon
             forecast_frame.grid_rowconfigure(2, weight=0)  # Condition
@@ -242,29 +293,32 @@ class AppWindow(ctk.CTk):
             day_label = ctk.CTkLabel(
                 forecast_frame,
                 text=f"{get_translation('day', config.LANGUAGE)} {i+1}",
-                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE, weight="bold")
+                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE, weight="bold") # Use config
             )
-            day_label.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
-            
+            # Use config padding
+            day_label.grid(row=0, column=0, sticky="ew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
             # Placeholder for weather icon
             icon_label = ctk.CTkLabel(forecast_frame, text="")
-            # Removed sticky="nsew" to prevent image distortion
-            icon_label.grid(row=1, column=0, sticky="", padx=10, pady=10)
+            # Removed sticky="nsew" to prevent image distortion - Use config padding
+            icon_label.grid(row=1, column=0, sticky="", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
 
             condition_label = ctk.CTkLabel(
                 forecast_frame,
                 text="--",
-                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE)
+                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE) # Use config
             )
-            condition_label.grid(row=2, column=0, sticky="ew", padx=10, pady=5)
-            
+            # Use config padding
+            condition_label.grid(row=2, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
+
             temp_label = ctk.CTkLabel(
                 forecast_frame,
                 text="--°C / --°C",
-                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE)
+                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE) # Use config
             )
-            temp_label.grid(row=3, column=0, sticky="ew", padx=10, pady=10)
-            
+            # Use config padding
+            temp_label.grid(row=3, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+
             self.forecast_frames.append({
                 'frame': forecast_frame,
                 'day': day_label,
@@ -280,17 +334,57 @@ class AppWindow(ctk.CTk):
         Args:
             time_str (str): Time string in HH:MM:SS format
         """
-        self.time_label.configure(text=time_str)
-    
+        # Format time to HH:MM
+        time_parts = time_str.split(':')
+        if len(time_parts) >= 2:
+            formatted_time = f"{time_parts[0]}:{time_parts[1]}"
+            self.time_label.configure(text=formatted_time)
+        else:
+            self.time_label.configure(text=time_str) # Fallback
+
     def update_date(self, date_str):
         """
-        Update the date display.
-        
+        Update the multi-part date display.
+
         Args:
-            date_str (str): Date string
+            date_str (str): Date string (e.g., "Sunday, 04 May 2025")
+                            Assumes the format includes Weekday, Day, Month, Year.
         """
-        self.date_label.configure(text=date_str)
-    
+        try:
+            # Attempt to parse the date string to extract components reliably
+            # Example parsing assuming format like "Weekday, DD Month YYYY"
+            # This might need adjustment based on the actual format from main.py
+            # Using strptime requires knowing the exact format including locale.
+            # A simpler string split might be more robust if the format is consistent.
+
+            parts = date_str.split(', ') # -> ["Sunday", "04 May 2025"]
+            if len(parts) == 2:
+                weekday = parts[0]
+                date_parts = parts[1].split(' ') # -> ["04", "May", "2025"]
+                if len(date_parts) == 3:
+                    day = date_parts[0].lstrip('0') # Remove leading zero if present
+                    month = date_parts[1]
+                    year = date_parts[2]
+
+                    self.weekday_label.configure(text=weekday)
+                    self.day_label.configure(text=day)
+                    self.month_year_label.configure(text=f"{month} {year}")
+                    return # Success
+
+            # Fallback if parsing fails - display the raw string in weekday label
+            logger.warning(f"Could not parse date string: '{date_str}'. Displaying raw.")
+            self.weekday_label.configure(text=date_str)
+            self.day_label.configure(text="")
+            self.month_year_label.configure(text="")
+
+        except Exception as e:
+            logger.error(f"Error updating date display for '{date_str}': {e}")
+            # Display fallback text on error
+            self.weekday_label.configure(text=get_translation('not_available', config.LANGUAGE))
+            self.day_label.configure(text="")
+            self.month_year_label.configure(text="")
+
+
     def update_current_weather(self, weather_data):
         """
         Update the current weather display.
@@ -376,7 +470,8 @@ class AppWindow(ctk.CTk):
 
             # Update icon using the WeatherIconHandler and icon_code
             if 'icon_code' in day_data and day_data['icon_code'] is not None:
-                icon_image = self.icon_handler.load_icon(day_data['icon_code'], size=(96, 96))
+                # Use config icon size
+                icon_image = self.icon_handler.load_icon(day_data['icon_code'], size=config.FORECAST_ICON_SIZE)
                 if icon_image:
                     frame_info['icon'].configure(image=icon_image, text="") # Clear text if image loads
                     # Keep a reference to prevent garbage collection
