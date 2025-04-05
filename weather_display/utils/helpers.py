@@ -11,6 +11,7 @@ import requests
 import time
 import socket
 from datetime import datetime
+import urllib.parse # Added for URL construction
 from .. import config
 from .localization import get_translation, get_day_name_localized, get_air_quality_text_localized
 from PIL import Image
@@ -51,6 +52,12 @@ def fetch_with_retry(url, params=None, max_retries=3, timeout=10):
     while retry_count < max_retries:
         response = None # Initialize response to None
         try:
+            # Construct the full URL with parameters for logging
+            full_url = url
+            if params:
+                full_url += '?' + urllib.parse.urlencode(params)
+            logger.info(f"Making API request to: {full_url}") # Log the full URL
+
             response = requests.get(url, params=params, timeout=timeout)
 
             # Check for specific AccuWeather API limit error *before* raise_for_status

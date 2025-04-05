@@ -6,7 +6,7 @@ Displays time, date, current weather, forecast, and connection status.
 
 import logging
 import customtkinter as ctk
-import os
+# Removed unused os import
 from PIL import Image
 # Import the new AQI translation function as well
 from ..utils.localization import get_translation, translate_weather_condition, translate_aqi_category
@@ -18,7 +18,9 @@ except ImportError:
     logging.error("ImageTk is not available. GUI will not work properly.")
 
 from .. import config
-from ..utils.helpers import load_image
+# Removed unused load_image import
+# Import the WeatherIconHandler
+from ..utils.icon_handler import WeatherIconHandler
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +38,10 @@ class AppWindow(ctk.CTk):
         # Configure window
         self.title(get_translation('app_title', config.LANGUAGE))
         self.geometry(f"{config.APP_WIDTH}x{config.APP_HEIGHT}")
-        
+
+        # Instantiate the icon handler
+        self.icon_handler = WeatherIconHandler()
+
         if config.FULLSCREEN:
             # Try multiple approaches for fullscreen
             try:
@@ -243,8 +248,9 @@ class AppWindow(ctk.CTk):
             
             # Placeholder for weather icon
             icon_label = ctk.CTkLabel(forecast_frame, text="")
-            icon_label.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
-            
+            # Removed sticky="nsew" to prevent image distortion
+            icon_label.grid(row=1, column=0, sticky="", padx=10, pady=10)
+
             condition_label = ctk.CTkLabel(
                 forecast_frame,
                 text="--",
@@ -368,18 +374,18 @@ class AppWindow(ctk.CTk):
                 day_name = get_day_name(date_part)
                 frame_info['day'].configure(text=day_name)
 
-            # Update icon using the direct path from the API client
-            if 'icon_path' in day_data and day_data['icon_path'] and os.path.exists(day_data['icon_path']):
-                icon_image = load_image(day_data['icon_path'], size=(96, 96))
+            # Update icon using the WeatherIconHandler and icon_code
+            if 'icon_code' in day_data and day_data['icon_code'] is not None:
+                icon_image = self.icon_handler.load_icon(day_data['icon_code'], size=(96, 96))
                 if icon_image:
                     frame_info['icon'].configure(image=icon_image, text="") # Clear text if image loads
                     # Keep a reference to prevent garbage collection
                     frame_info['icon'].image = icon_image
                 else:
-                    # Clear image if loading fails
+                    # Clear image if loading fails (handler logs error)
                     frame_info['icon'].configure(image=None, text=get_translation('icon_missing', config.LANGUAGE))
             else:
-                 # Clear image if path is missing or invalid
+                 # Clear image if icon code is missing or None
                  frame_info['icon'].configure(image=None, text=get_translation('icon_missing', config.LANGUAGE))
 
 

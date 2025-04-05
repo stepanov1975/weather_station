@@ -10,7 +10,7 @@ APP_WIDTH = 1440
 APP_HEIGHT = 810
 FULLSCREEN = True
 UPDATE_INTERVAL_SECONDS = 1  # For time display
-WEATHER_UPDATE_INTERVAL_MINUTES = 30  # For weather data
+WEATHER_UPDATE_INTERVAL_MINUTES = 60  # For weather data
 
 # Location settings
 # Reverted back to City,Country format

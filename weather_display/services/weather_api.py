@@ -474,24 +474,16 @@ class AccuWeatherClient:
                 day_info = day_data.get('Day', {})
                 # night_info = day_data.get('Night', {}) # Can use night info if needed
 
-                day_icon_num = day_info.get('Icon')
-                day_icon_path = None
-                day_icon_url = None
-                if day_icon_num:
-                    icon_str = f"{day_icon_num:02d}"
-                    icon_filename = f"{icon_str}-s.png"
-                    accu_icon_url = f"https://developer.accuweather.com/sites/default/files/{icon_filename}"
-                    day_icon_path = download_image(accu_icon_url, 'weather_display/assets/icons', filename=icon_filename)
-                    day_icon_url = accu_icon_url
+                day_icon_num = day_info.get('Icon') # Get the icon code (integer)
 
+                # Removed icon URL construction and download logic
 
                 forecast_days.append({
                     'date': day_data.get('Date'),
                     'max_temp': temp_info.get('Maximum', {}).get('Value'),
                     'min_temp': temp_info.get('Minimum', {}).get('Value'),
                     'condition': day_info.get('IconPhrase'), # Using day phrase
-                    'icon_url': day_icon_url, # URL or path
-                    'icon_path': day_icon_path # Path
+                    'icon_code': day_icon_num # Store the icon code directly
                 })
 
             # Update cache
@@ -564,15 +556,15 @@ class AccuWeatherClient:
         for i in range(days):
             date = base_date + timedelta(days=i)
             condition_index = random.randint(0, len(conditions) - 1)
-            mock_icon_num = icon_nums[condition_index]
-            mock_icon_path = f"weather_display/assets/icons/{mock_icon_num:02d}-s.png" # Mock path
+            mock_icon_num = icon_nums[condition_index] # Get the mock icon code
+
+            # Removed mock icon path and URL construction
 
             forecast.append({
                 'date': date.strftime('%Y-%m-%dT%H:%M:%S%z'), # Mock ISO format
                 'max_temp': round(25.0 + random.uniform(-3, 3), 1),
                 'min_temp': round(18.0 + random.uniform(-2, 2), 1),
                 'condition': conditions[condition_index],
-                'icon_url': f"https://developer.accuweather.com/sites/default/files/{mock_icon_num:02d}-s.png",
-                'icon_path': mock_icon_path
+                'icon_code': mock_icon_num # Store the mock icon code
             })
         return forecast
