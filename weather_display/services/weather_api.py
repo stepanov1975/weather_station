@@ -67,7 +67,7 @@ class AccuWeatherClient:
         self.api_key: Optional[str] = api_key or config.ACCUWEATHER_API_KEY
         self.location_query: str = location_query or config.LOCATION
         self.base_url: str = config.ACCUWEATHER_BASE_URL
-        self.language: str = config.LANGUAGE
+        self.language: str = "en-us"
 
         logger.info(f"AccuWeatherClient initialized for location: '{self.location_query}'")
 
@@ -154,7 +154,7 @@ class AccuWeatherClient:
             params = {
                 'apikey': self.api_key,
                 'q': self.location_query,
-                'language': self.language
+                'language': "en-us"
             }
             logger.info(f"Fetching location key from API for query: '{self.location_query}'")
             location_search_results = fetch_with_retry(url, params)

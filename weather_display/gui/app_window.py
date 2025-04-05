@@ -53,6 +53,7 @@ class AppWindow(ctk.CTk):
         # Widget references (add type hints)
         connection_indicator (ctk.CTkLabel): Label for internet status.
         api_limit_indicator (ctk.CTkLabel): Label for API limit status.
+        api_error_indicator (ctk.CTkLabel): Label for general API error status.
         time_label (ctk.CTkLabel): Label displaying the current time.
         weekday_label (ctk.CTkLabel): Label for the day of the week.
         day_label (ctk.CTkLabel): Label for the day of the month.
@@ -130,7 +131,11 @@ class AppWindow(ctk.CTk):
             self, corner_radius=0, height=config.CONNECTION_FRAME_HEIGHT
         )
         self.connection_frame.grid(row=0, column=0, sticky="ew")
-        self.connection_frame.grid_columnconfigure(0, weight=1) # Allow content to align right
+        # Configure columns: 0 expands (spacer), 1, 2, 3 are for indicators
+        self.connection_frame.grid_columnconfigure(0, weight=1) # Spacer column pushes indicators right
+        self.connection_frame.grid_columnconfigure(1, weight=0) # Connection indicator
+        self.connection_frame.grid_columnconfigure(2, weight=0) # API Limit indicator
+        self.connection_frame.grid_columnconfigure(3, weight=0) # API Error indicator
         self.connection_frame.grid_propagate(False) # Prevent resizing by content
 
         # Top Section (Time, Date, Current Weather)
@@ -169,13 +174,15 @@ class AppWindow(ctk.CTk):
             text_color=config.STATUS_TEXT_COLOR,
             corner_radius=config.STATUS_INDICATOR_CORNER_RADIUS
         )
+        # Place Connection Indicator in column 1
         self.connection_indicator.grid(
-            row=0, column=0, sticky="e",
-            padx=(config.ELEMENT_PADDING_X * 2, config.ELEMENT_PADDING_X),
+            row=0, column=1, sticky="e",
+            padx=config.ELEMENT_PADDING_X, # Standard padding
             pady=config.ELEMENT_PADDING_Y
         )
         self.connection_indicator.grid_remove() # Hide initially
 
+        # API Limit Indicator
         self.api_limit_indicator = ctk.CTkLabel(
             self.connection_frame,
             text=get_translation('api_limit_reached', config.LANGUAGE),
@@ -184,12 +191,30 @@ class AppWindow(ctk.CTk):
             text_color=config.STATUS_TEXT_COLOR,
             corner_radius=config.STATUS_INDICATOR_CORNER_RADIUS
         )
+        # Place API Limit Indicator in column 2
         self.api_limit_indicator.grid(
-            row=0, column=1, sticky="e",
+            row=0, column=2, sticky="e",
             padx=config.ELEMENT_PADDING_X,
             pady=config.ELEMENT_PADDING_Y
         )
         self.api_limit_indicator.grid_remove() # Hide initially
+
+        # API Error Indicator
+        self.api_error_indicator = ctk.CTkLabel(
+            self.connection_frame,
+            text=get_translation('api_error', config.LANGUAGE),
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.STATUS_INDICATOR_FONT_SIZE),
+            fg_color=config.API_ERROR_COLOR,
+            text_color=config.STATUS_TEXT_COLOR,
+            corner_radius=config.STATUS_INDICATOR_CORNER_RADIUS
+        )
+        # Place API Error Indicator in column 3
+        self.api_error_indicator.grid(
+            row=0, column=3, sticky="e",
+            padx=config.ELEMENT_PADDING_X,
+            pady=config.ELEMENT_PADDING_Y
+        )
+        self.api_error_indicator.grid_remove() # Hide initially
 
     def _create_time_display(self):
         """Create the large time display label."""
@@ -202,9 +227,9 @@ class AppWindow(ctk.CTk):
                 weight="bold"
             )
         )
-        # Center the label within its grid cell (top_frame row 0, col 0)
+        # Make the label fill the cell; text is centered by default within the label
         self.time_label.grid(
-            row=0, column=0, sticky="", # Default centers in expanding cell
+            row=0, column=0, sticky="nsew", # Fill cell, text defaults to center
             padx=(config.SECTION_PADDING_X, config.ELEMENT_PADDING_X),
             pady=config.SECTION_PADDING_Y
         )
@@ -218,36 +243,39 @@ class AppWindow(ctk.CTk):
             padx=(config.ELEMENT_PADDING_X, config.SECTION_PADDING_X),
             pady=config.SECTION_PADDING_Y
         )
+        # Configure the main date frame to have one expanding cell to center content
         self.date_display_frame.grid_columnconfigure(0, weight=1)
-        # Configure rows for vertical stacking and centering within the frame
-        self.date_display_frame.grid_rowconfigure(0, weight=1) # Weekday (flexible space)
-        self.date_display_frame.grid_rowconfigure(1, weight=0) # Day (takes needed space)
-        self.date_display_frame.grid_rowconfigure(2, weight=1) # Month/Year (flexible space)
+        self.date_display_frame.grid_rowconfigure(0, weight=1)
 
+        # Create an inner frame to hold the actual labels, this inner frame will be centered
+        inner_date_labels_frame = ctk.CTkFrame(self.date_display_frame, fg_color="transparent")
+        inner_date_labels_frame.grid(row=0, column=0, sticky="") # Center the inner frame
+
+        # --- Place labels inside the inner frame using pack for simple stacking ---
         # Weekday Label
         self.weekday_label = ctk.CTkLabel(
-            self.date_display_frame, text="Weekday",
+            inner_date_labels_frame, text="Weekday",
             font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.DATE_FONT_SIZE_BASE)
         )
-        self.weekday_label.grid(row=0, column=0, sticky="s", pady=(0, config.TEXT_PADDING_Y))
+        self.weekday_label.pack(pady=(0, config.TEXT_PADDING_Y)) # Add padding below
 
         # Day Label (Large)
         self.day_label = ctk.CTkLabel(
-            self.date_display_frame, text="00",
+            inner_date_labels_frame, text="00",
             font=ctk.CTkFont(
                 family=config.FONT_FAMILY,
                 size=config.DATE_FONT_SIZE_BASE + config.DATE_DAY_FONT_SIZE_INCREASE,
                 weight="bold"
             )
         )
-        self.day_label.grid(row=1, column=0, sticky="", pady=0) # Centered horizontally
+        self.day_label.pack(pady=0) # No extra padding around the main day number
 
         # Month Year Label
         self.month_year_label = ctk.CTkLabel(
-            self.date_display_frame, text="Month 0000",
+            inner_date_labels_frame, text="Month 0000",
             font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.DATE_FONT_SIZE_BASE)
         )
-        self.month_year_label.grid(row=2, column=0, sticky="n", pady=(config.TEXT_PADDING_Y, 0))
+        self.month_year_label.pack(pady=(config.TEXT_PADDING_Y, 0)) # Add padding above
 
     def _create_current_weather_display(self):
         """Create frames and labels for the current weather section."""
@@ -527,24 +555,34 @@ class AppWindow(ctk.CTk):
 
         Args:
             connection_status: True if internet is connected, False otherwise.
-            api_status: Status string from the API client ('ok', 'limit_reached', etc.).
+            api_status: Status string from the API client ('ok', 'limit_reached', 'error', etc.).
         """
-        # Connection Indicator
+        # --- Handle Connection Status ---
         if not connection_status:
-            self.connection_indicator.grid() # Show
-            self.connection_indicator.lift() # Bring to front
-            # Log only once when status changes to disconnected? Or rely on API client logs?
-            # logger.warning("No internet connection detected.")
-        else:
-            self.connection_indicator.grid_remove() # Hide
+            # Show only connection error, hide others
+            self.connection_indicator.grid()
+            self.connection_indicator.lift()
+            self.api_limit_indicator.grid_remove()
+            self.api_error_indicator.grid_remove()
+            return # No need to check API status if offline
 
-        # API Limit Indicator (only show if connected and limit reached)
-        if connection_status and api_status == 'limit_reached':
-            self.api_limit_indicator.grid() # Show
-            self.api_limit_indicator.lift() # Bring to front
-            # logger.warning("API request limit reached.") # Logged by API client
+        # --- Handle API Status (if connected) ---
+        self.connection_indicator.grid_remove() # Hide connection error if connected
+
+        # API Limit Indicator
+        if api_status == 'limit_reached':
+            self.api_limit_indicator.grid()
+            self.api_limit_indicator.lift()
+            self.api_error_indicator.grid_remove() # Hide error indicator
+        # API Error Indicator
+        elif api_status == 'error':
+            self.api_error_indicator.grid()
+            self.api_error_indicator.lift()
+            self.api_limit_indicator.grid_remove() # Hide limit indicator
+        # OK or Mock status - hide both API indicators
         else:
-            self.api_limit_indicator.grid_remove() # Hide
+            self.api_limit_indicator.grid_remove()
+            self.api_error_indicator.grid_remove()
 
     def exit_fullscreen(self, event=None):
         """Callback function to exit fullscreen mode (bound to Escape key)."""

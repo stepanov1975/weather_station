@@ -68,7 +68,7 @@ TEXT_PADDING_Y = 2
 
 # --- Sizes (in pixels) ---
 FORECAST_ICON_SIZE = (96, 96)  # (width, height) for forecast icons
-CONNECTION_FRAME_HEIGHT = 10  # Height of the top connection status bar
+CONNECTION_FRAME_HEIGHT = 30  # Height of the top connection status bar (Increased from 10)
 
 # --- Colors ---
 # Theme colors (Note: These might be overridden by CustomTkinter's theme)

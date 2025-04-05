@@ -51,6 +51,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'unknown': 'Unknown', # General unknown value
         'no_internet': 'No Internet Connection',
         'api_limit_reached': 'API Limit Reached',
+        'api_error': 'API Error', # Added for general API errors
 
         # Day names (full) - Used by get_formatted_date, get_day_name_localized
         'monday': 'Monday',
@@ -141,6 +142,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'unknown': 'Неизвестно',
         'no_internet': 'Нет подключения к Интернету',
         'api_limit_reached': 'Достигнут лимит API',
+        'api_error': 'Ошибка API', # Added for general API errors
 
         # Day names (full)
         'monday': 'Понедельник',
