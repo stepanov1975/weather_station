@@ -204,7 +204,7 @@ class AppWindow(ctk.CTk):
         )
         # Center the label within its grid cell (top_frame row 0, col 0)
         self.time_label.grid(
-            row=0, column=0, sticky="",
+            row=0, column=0, sticky="", # Default centers in expanding cell
             padx=(config.SECTION_PADDING_X, config.ELEMENT_PADDING_X),
             pady=config.SECTION_PADDING_Y
         )
@@ -273,7 +273,7 @@ class AppWindow(ctk.CTk):
         self.temp_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
         self.temp_value = ctk.CTkLabel(
             self.temp_frame, text="--°C",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 10, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 40, weight="bold")
         )
         self.temp_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
 
@@ -289,7 +289,7 @@ class AppWindow(ctk.CTk):
         self.humidity_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
         self.humidity_value = ctk.CTkLabel(
             self.humidity_frame, text="--%",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 10, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 40, weight="bold")
         )
         self.humidity_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
 
@@ -305,7 +305,7 @@ class AppWindow(ctk.CTk):
         self.air_quality_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
         self.air_quality_value = ctk.CTkLabel(
             self.air_quality_frame, text="--",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 10, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
         )
         self.air_quality_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
 
