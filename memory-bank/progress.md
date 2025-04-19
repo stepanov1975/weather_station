@@ -1,70 +1,74 @@
-# Progress: Weather Claude (Dual API Integration & GUI Restoration)
+# Progress: Weather Claude (API Optimization & Status Indicators)
 
 ## 1. What Works
 
 - **Project Structure:** Basic Python project structure remains functional.
 - **Dependencies & Packaging:** Assumed functional.
 - **Assets:** Weather icons are present.
-- **Memory Bank:** Core documentation files exist.
+- **Memory Bank:** Core documentation files exist and are being updated.
 - **Dual API Fetching:**
     - `main.py` initializes both `IMSLastHourWeather` and `AccuWeatherClient`.
-    - Separate background threads update IMS data (10 min interval) and AccuWeather data (120 min interval).
-    - Configuration (`config.py`) defines separate update intervals (`IMS_UPDATE_INTERVAL_MINUTES`, `ACCUWEATHER_UPDATE_INTERVAL_MINUTES`).
-    - AccuWeather API key handling restored (command-line `--api-key`, config fallback, environment variable).
-    - AccuWeather base URL configured in `config.py`.
+    - Separate background threads update IMS data and AccuWeather data at configured intervals.
+    - Configuration (`config.py`) defines separate update intervals.
+    - AccuWeather API key handling functional (command-line, env var, config).
+    - AccuWeather base URL configured.
+- **API Caching & Optimization:**
+    - **Location Key:** Persistent file caching (`location_cache.json`) and in-memory caching implemented in `services/weather_api.py`.
+    - **Current Weather & Forecast:** Persistent file caching (`current_weather_cache.json`, `forecast_cache.json`) and in-memory caching implemented in `services/weather_api.py`.
+    - **Conditional AQI:** API call for AQI is skipped if `show_air_quality` is `False` in `config.py`.
 - **GUI Display:**
-    - `gui/app_window.py` restored to display IMS Temp/Humidity, AccuWeather AQI, and 3-day AccuWeather forecast.
-    - Data flow from `main.py`'s AccuWeather update loop to the GUI's `update_current_weather` (for AQI) and `update_forecast` methods is implemented.
-    - Status indicators for connection, API limit, and API errors are present and updated (can be hidden via config).
+    - `gui/app_window.py` displays IMS Temp/Humidity, AccuWeather AQI (if enabled), and 3-day AccuWeather forecast.
+    - Data flow from `main.py` update loops to the GUI methods (`update_current_weather`, `update_forecast`, `update_status_indicators`) is implemented via `app.after()`.
+    - **Persistent Status Indicators:** Status bar (if enabled) now always shows Network status and API status (including last successful AccuWeather update time).
 - **GUI Refactoring (Configuration-Driven):**
-    - `gui/app_window.py` refactored to use a modular, component-based structure.
-    - Layout (region heights), styling (fonts, colors, padding, margins, radii), and optional elements (status bar, humidity, AQI) are now controlled via `config.py`.
-- **Code Documentation:** All Python files within `weather_display` now have detailed docstrings.
+    - `gui/app_window.py` uses a modular, component-based structure.
+    - Layout, styling, and optional elements are controlled via `config.py`.
+- **Code Documentation:** Detailed docstrings exist for all modules/classes/functions in `weather_display`.
 - **README:** Updated `README.md` reflects current features and includes Raspberry Pi 4 details.
 - **Bug Fixes:**
-    - Corrected date parsing in `utils/localization.py` to handle AccuWeather's timestamp format.
-    - Corrected icon loading call in `gui/app_window.py` (`load_icon` instead of `get_icon`).
-    - Fixed `NameError` for `List` in `utils/helpers.py` by adding import.
-    - Fixed `TypeError` in `gui/app_window.py` by correcting arguments passed to `get_day_name`.
+    - Corrected date parsing (`utils/localization.py`).
+    - Corrected icon loading call (`gui/app_window.py`).
+    - Fixed `NameError` for `List` (`utils/helpers.py`).
+    - Fixed `TypeError` for `get_day_name` arguments (`gui/app_window.py`).
+    - Fixed `TypeError` related to `update_status_indicators` parameters (`gui/app_window.py`).
+    - Fixed indentation errors in fullscreen logic (`gui/app_window.py`).
+- **Fullscreen Mode:** Application attempts to start in fullscreen (if configured) with a slight delay for better compatibility.
 
 ## 2. What's Left to Build / Verify
 
-- **End-to-End Testing:** Verify the application runs correctly after the GUI refactoring. Confirm display updates as expected and test different configuration options (layout, fonts, colors, optional elements).
-- **Error Handling Robustness:** Further testing of network issues, API errors (beyond limits), and edge cases, especially with the refactored GUI.
-- **Configuration Review:** Ensure location configuration (`config.LOCATION`, `config.IMS_STATION_NAME`) is optimal. Review the new UI configuration options for clarity and completeness.
-- **Code Testing:** Review and potentially implement unit/integration tests for the services, GUI updates, and utility functions.
-- **Refinement:** Ongoing review against PEP 8 and custom instructions.
+- **End-to-End Testing:** Verify the application runs correctly after recent changes. Confirm display updates, status indicators, caching behavior, and fullscreen mode. Test different configuration options.
+- **Error Handling Robustness:** Further testing of network issues, API errors (beyond limits), and edge cases, especially with the new caching and status logic. Test behavior when cache files are missing or corrupted.
+- **Configuration Review:** Ensure location configuration is optimal. Review new UI configuration options (especially status colors).
+- **Code Testing:** Review and potentially implement unit/integration tests for services, GUI updates, utility functions, and caching logic.
+- **Refinement:** Ongoing review against PEP 8 and custom instructions. Consider localization for status indicator text.
 
 ## 3. Current Status
 
-- **GUI Refactored:** The GUI (`gui/app_window.py`) is now modular and driven by extensive configuration options in `config.py`.
-- **Dual API Integration Complete:** Code modified to fetch and handle data from both IMS and AccuWeather at specified intervals.
-- **GUI Functionality Restored:** Forecast and AQI display elements and logic restored in the GUI. (Note: This is now part of the refactored GUI).
-- **Configuration Updated:** `config.py` updated with necessary API settings and intervals.
-- **Key Bugs Fixed:** Addressed `TypeError` in date parsing, `AttributeError` in icon handling, `NameError` in helpers, and `TypeError` in GUI forecast update based on runtime feedback.
-- **Documentation Complete:** Added detailed docstrings to all Python modules within `weather_display`.
-- **README Updated:** `README.md` revised to reflect current state, features, and target platform (Raspberry Pi 4).
+- **API Optimization Implemented:** Conditional AQI fetching and persistent file caching for weather/forecast data added to `services/weather_api.py`.
+- **Status Indicators Enhanced:** GUI (`gui/app_window.py`) and main logic (`main.py`) updated to provide persistent network and API status, including the time of the last successful AccuWeather update.
+- **GUI Functionality Verified:** Core display elements (Time, Date, Temp, Humidity, AQI, Forecast) are functional after recent fixes.
+- **Fullscreen Behavior Improved:** Implemented delayed application of fullscreen attribute in `gui/app_window.py`.
+- **Key Bugs Fixed:** Addressed `TypeError` in `update_status_indicators` call, indentation errors in fullscreen logic. Previous fixes for date parsing, icon loading, `NameError`, and `get_day_name` arguments remain.
+- **Documentation Updated:** Memory Bank files are being updated to reflect the latest changes.
 
 ## 4. Known Issues
 
-- None identified based on the last successful run and fixes implemented. Pending further testing.
+- Status indicator text ("Network: OK", "API: Limit", etc.) is not yet localized.
+- Status indicator colors rely on keys (`status_ok_text`, etc.) that might not be defined in `config.py` yet.
 
 ## 5. Evolution of Project Decisions
 
-- **April 19, 2025 (Initial):** Initialized the Memory Bank based on project file structure and inferred goals.
-- **April 19, 2025 (Update 1):**
-    - Configured separate update intervals for IMS (10 min) and AccuWeather (120 min) in `config.py`.
-    - Restored AccuWeather functionality (API key handling, forecast/AQI data fetching) in `main.py` and `services/weather_api.py`.
-    - Restored GUI elements and update logic for forecast/AQI in `gui/app_window.py`.
-    - Implemented separate background update loops in `main.py`.
-    - Fixed `TypeError` in date parsing (`utils/localization.py`).
-    - Fixed `AttributeError` in icon handling (`gui/app_window.py`).
-    - Restored missing AccuWeather config settings (`ACCUWEATHER_BASE_URL`, `ACCUWEATHER_API_KEY`) in `config.py`.
-- **April 19, 2025 (Update 2):**
-    - Added detailed docstrings to all Python files in the `weather_display` package (`__init__.py`, `config.py`, `main.py`, `gui/*`, `services/*`, `utils/*`).
-    - Updated `README.md` to be more detailed, reflect current features (dual API), and specify Raspberry Pi 4 as the target platform.
-    - Fixed `NameError: name 'List' is not defined` in `utils/helpers.py`.
-    - Fixed `TypeError: get_day_name() takes 1 positional argument but 2 were given` in `gui/app_window.py`.
-- **April 19, 2025 (Update 3 - GUI Refactor):**
-    - Refactored `gui/app_window.py` for modularity and configuration-driven layout/styling.
-    - Updated `config.py` with detailed UI settings (layout weights, fonts, colors, padding, optional elements).
+- **April 19, 2025 (Initial):** Initialized the Memory Bank.
+- **April 19, 2025 (Update 1):** Restored dual API fetching and basic GUI display.
+- **April 19, 2025 (Update 2):** Added docstrings, updated README, fixed initial bugs.
+- **April 19, 2025 (Update 3 - GUI Refactor):** Refactored GUI for configuration-driven layout/styling.
+- **April 19, 2025 (Update 4 - API Optimization):**
+    - Verified location key caching in `services/weather_api.py`.
+    - Implemented conditional AQI fetching in `services/weather_api.py`.
+    - Added persistent file caching for current weather and forecast data in `services/weather_api.py`.
+- **April 19, 2025 (Update 5 - Status Indicators & Fixes):**
+    - Modified `main.py` to track and pass last AccuWeather success time.
+    - Refactored status indicators in `gui/app_window.py` for persistent display.
+    - Fixed `TypeError` in `update_current_weather` call to `update_status_indicators`.
+    - Implemented delayed fullscreen in `gui/app_window.py`.
+    - Fixed multiple indentation errors in `gui/app_window.py`.

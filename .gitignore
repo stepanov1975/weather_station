@@ -64,3 +64,8 @@ Thumbs.db
 # Project specific
 weather_display/assets/icons/*
 !weather_display/assets/icons/.gitkeep
+
+# Cache Files
+location_cache.json
+current_weather_cache.json
+forecast_cache.json

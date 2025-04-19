@@ -53,10 +53,16 @@ try:
     if not os.path.basename(_PROJECT_ROOT): # Handle edge case if running from root directly
          _PROJECT_ROOT = os.path.dirname(_MODULE_DIR)
     LOCATION_CACHE_FILE = os.path.join(_PROJECT_ROOT, "location_cache.json")
+    CURRENT_WEATHER_CACHE_FILE = os.path.join(_PROJECT_ROOT, "current_weather_cache.json")
+    FORECAST_CACHE_FILE = os.path.join(_PROJECT_ROOT, "forecast_cache.json")
     logger.debug(f"Location cache file path set to: {LOCATION_CACHE_FILE}")
+    logger.debug(f"Current weather cache file path set to: {CURRENT_WEATHER_CACHE_FILE}")
+    logger.debug(f"Forecast cache file path set to: {FORECAST_CACHE_FILE}")
 except Exception as e:
-    logger.error(f"Error determining project root for location cache file: {e}. Using current dir as fallback.")
+    logger.error(f"Error determining project root for cache files: {e}. Using current dir as fallback.")
     LOCATION_CACHE_FILE = "location_cache.json" # Fallback path
+    CURRENT_WEATHER_CACHE_FILE = "current_weather_cache.json" # Fallback path
+    FORECAST_CACHE_FILE = "forecast_cache.json" # Fallback path
 
 
 # --- Expected Cache Structure (Informational) ---
@@ -465,13 +471,43 @@ class AccuWeatherClient:
         current_time = time.time()
         has_connection = self.connection_status # Check current connection status
         api_status = 'ok' # Assume OK initially
-
-        # --- 1. Check Cache ---
-        # Cache duration is based on the configured update interval
         cache_duration = config.ACCUWEATHER_UPDATE_INTERVAL_MINUTES * 60
+
+        # --- 1a. Check Persistent File Cache ---
+        if not force_refresh:
+            logger.debug(f"Checking persistent current weather cache file: {CURRENT_WEATHER_CACHE_FILE}")
+            try:
+                if os.path.exists(CURRENT_WEATHER_CACHE_FILE):
+                    with open(CURRENT_WEATHER_CACHE_FILE, 'r') as f:
+                        file_cache = json.load(f)
+                    cached_data = file_cache.get('data')
+                    cached_time = file_cache.get('timestamp')
+
+                    # Validate file cache entry against configured interval
+                    if cached_data and cached_time and (current_time - cached_time) < cache_duration:
+                        logger.info("Using current weather data from valid file cache.")
+                        # Update in-memory cache as well
+                        self.cache['current'] = cached_data
+                        self.cache['last_weather_update'] = cached_time
+                        # Return data from file cache
+                        return {
+                            'data': cached_data.copy(),
+                            'connection_status': has_connection, # Report current connection
+                            'api_status': 'ok' # Assume ok if cache valid
+                        }
+                    else:
+                        logger.debug("Current weather file cache expired or invalid content.")
+                else:
+                    logger.debug("Current weather file cache does not exist.")
+            except (IOError, json.JSONDecodeError, TypeError, KeyError) as e:
+                logger.warning(f"Error reading or parsing current weather cache file '{CURRENT_WEATHER_CACHE_FILE}': {e}. Will check memory cache or fetch.")
+                # Continue to check in-memory cache or fetch
+
+        # --- 1b. Check In-Memory Cache ---
+        # This runs if file cache was invalid, missing, errored, or refresh forced
         if not force_refresh and self._is_cache_valid('current', cache_duration):
-            logger.debug("Returning cached current weather data.")
-            # Return a copy of the cached data
+            logger.debug("Returning cached current weather data from in-memory cache.")
+            # Return a copy of the in-memory cached data
             return {
                 'data': self.cache['current'].copy(),
                 'connection_status': has_connection, # Report current connection status
@@ -571,23 +607,40 @@ class AccuWeatherClient:
             }
             logger.debug(f"Parsed current conditions: Temp={parsed_data['temperature']}, Humidity={parsed_data['humidity']}, Condition='{parsed_data['condition']}'")
 
-            # --- 6. Fetch AQI Data (Best Effort) ---
-            aqi_result = self._get_current_aqi(location_key)
-            if aqi_result:
-                parsed_data['air_quality_index'] = aqi_result.get('Value')
-                parsed_data['air_quality_category'] = aqi_result.get('Category')
-                logger.debug(f"Added AQI data: Index={parsed_data['air_quality_index']}, Category='{parsed_data['air_quality_category']}'")
+            # --- 6. Fetch AQI Data (Best Effort, only if configured to show) ---
+            if config.OPTIONAL_ELEMENTS.get('show_air_quality', True): # Default to True if key missing
+                logger.debug("AQI display is enabled in config, attempting fetch.")
+                aqi_result = self._get_current_aqi(location_key)
+                if aqi_result:
+                    parsed_data['air_quality_index'] = aqi_result.get('Value')
+                    parsed_data['air_quality_category'] = aqi_result.get('Category')
+                    logger.debug(f"Added AQI data: Index={parsed_data['air_quality_index']}, Category='{parsed_data['air_quality_category']}'")
+                else:
+                    logger.warning("AQI data could not be fetched or was invalid.")
+                    # Keep AQI fields as None if fetch failed
             else:
-                 logger.warning("AQI data could not be fetched or was invalid.")
-                 # Keep AQI fields as None
+                logger.debug("AQI display is disabled in config, skipping AQI fetch.")
+                # Ensure AQI fields remain None if not fetched
+                parsed_data['air_quality_index'] = None
+                parsed_data['air_quality_category'] = None
 
-            # --- 7. Update Cache and Return ---
+            # --- 7. Update Caches and Return ---
+            # Update in-memory cache
             self.cache['current'] = parsed_data.copy() # Store a copy in cache
             self.cache['last_weather_update'] = current_time # Update timestamp
             logger.info("Successfully fetched and parsed current weather and AQI.")
 
+            # Save to persistent file cache
+            try:
+                cache_data_to_save = {'data': parsed_data, 'timestamp': current_time}
+                with open(CURRENT_WEATHER_CACHE_FILE, 'w') as f:
+                    json.dump(cache_data_to_save, f, indent=4)
+                logger.info(f"Saved current weather data to persistent file cache: {CURRENT_WEATHER_CACHE_FILE}")
+            except IOError as e:
+                logger.error(f"Error writing current weather data to file cache '{CURRENT_WEATHER_CACHE_FILE}': {e}")
+
             return {
-                'data': parsed_data,
+                'data': parsed_data.copy(), # Return a copy
                 'connection_status': True, # Connection was successful
                 'api_status': 'ok' # API call was successful
             }
@@ -644,15 +697,44 @@ class AccuWeatherClient:
         current_time = time.time()
         has_connection = self.connection_status
         api_status = 'ok'
-
-        # --- 1. Check Cache ---
-        # Forecast shares the same cache timestamp as current weather
         cache_duration = config.ACCUWEATHER_UPDATE_INTERVAL_MINUTES * 60
+
+        # --- 1a. Check Persistent File Cache ---
+        if not force_refresh:
+            logger.debug(f"Checking persistent forecast cache file: {FORECAST_CACHE_FILE}")
+            try:
+                if os.path.exists(FORECAST_CACHE_FILE):
+                    with open(FORECAST_CACHE_FILE, 'r') as f:
+                        file_cache = json.load(f)
+                    cached_data = file_cache.get('data') # Expecting a list
+                    cached_time = file_cache.get('timestamp')
+
+                    # Validate file cache entry
+                    if cached_data and isinstance(cached_data, list) and cached_time and (current_time - cached_time) < cache_duration:
+                        logger.info("Using forecast data from valid file cache.")
+                        # Update in-memory cache
+                        self.cache['forecast'] = cached_data
+                        self.cache['last_weather_update'] = cached_time # Use shared timestamp
+                        # Return data from file cache
+                        return {
+                            'data': cached_data, # Return the list directly
+                            'connection_status': has_connection,
+                            'api_status': 'ok'
+                        }
+                    else:
+                        logger.debug("Forecast file cache expired or invalid content.")
+                else:
+                    logger.debug("Forecast file cache does not exist.")
+            except (IOError, json.JSONDecodeError, TypeError, KeyError) as e:
+                logger.warning(f"Error reading or parsing forecast cache file '{FORECAST_CACHE_FILE}': {e}. Will check memory cache or fetch.")
+                # Continue
+
+        # --- 1b. Check In-Memory Cache ---
         if not force_refresh and self._is_cache_valid('forecast', cache_duration):
-            logger.debug("Returning cached forecast data.")
-            # Return a copy of the cached list
+            logger.debug("Returning cached forecast data from in-memory cache.")
+            # Return the cached list
             return {
-                'data': self.cache['forecast'], # Already a list
+                'data': self.cache['forecast'],
                 'connection_status': has_connection,
                 'api_status': 'ok'
             }
@@ -750,14 +832,23 @@ class AccuWeatherClient:
                 parsed_forecast_days.append(parsed_day)
                 logger.debug(f"  Parsed forecast day: Date={parsed_day['date']}, Max={parsed_day['max_temp']}, Min={parsed_day['min_temp']}, Cond='{parsed_day['condition']}', Icon={parsed_day['icon_code']}")
 
-            # --- 6. Update Cache and Return ---
+            # --- 6. Update Caches and Return ---
+            # Update in-memory cache
             self.cache['forecast'] = parsed_forecast_days # Store the full list
-            # Update the shared weather timestamp
-            self.cache['last_weather_update'] = current_time
+            self.cache['last_weather_update'] = current_time # Update the shared weather timestamp
             logger.info(f"Successfully fetched and parsed {len(parsed_forecast_days)}-day forecast.")
 
+            # Save to persistent file cache
+            try:
+                cache_data_to_save = {'data': parsed_forecast_days, 'timestamp': current_time}
+                with open(FORECAST_CACHE_FILE, 'w') as f:
+                    json.dump(cache_data_to_save, f, indent=4)
+                logger.info(f"Saved forecast data to persistent file cache: {FORECAST_CACHE_FILE}")
+            except IOError as e:
+                logger.error(f"Error writing forecast data to file cache '{FORECAST_CACHE_FILE}': {e}")
+
             return {
-                'data': parsed_forecast_days, # Return the full list fetched
+                'data': parsed_forecast_days, # Return the newly fetched list
                 'connection_status': True,
                 'api_status': 'ok'
             }

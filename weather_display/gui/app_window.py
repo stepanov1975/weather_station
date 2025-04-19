@@ -21,6 +21,7 @@ Responsibilities:
 import logging
 from typing import Dict, List, Any, Optional, Tuple
 import os
+from datetime import datetime # Added for timestamp formatting
 
 import customtkinter as ctk
 from PIL import Image
@@ -65,8 +66,8 @@ class AppWindow(ctk.CTk):
         forecast_frame (ctk.CTkFrame): Frame for the multi-day forecast.
         # --- Status Bar Widgets (Optional) ---
         connection_indicator (Optional[ctk.CTkLabel]): Internet status label.
-        api_limit_indicator (Optional[ctk.CTkLabel]): API limit status label.
-        api_error_indicator (Optional[ctk.CTkLabel]): API error status label.
+        network_status_label (Optional[ctk.CTkLabel]): Persistent network status label.
+        api_status_label (Optional[ctk.CTkLabel]): Persistent API status label with last success time.
         # --- Time/Date Widgets ---
         time_label (ctk.CTkLabel): Displays current time.
         date_display_frame (ctk.CTkFrame): Container for date elements.
@@ -153,25 +154,31 @@ class AppWindow(ctk.CTk):
     def _configure_fullscreen(self):
         """Configures fullscreen mode based on `config.FULLSCREEN`."""
         if config.FULLSCREEN:
-            logger.info("Attempting to enable fullscreen mode...")
-            try:
-                self.attributes("-fullscreen", True)
-                # Add platform-specific fallbacks if needed (similar to original)
-                logger.info("Fullscreen mode enabled (or attempted).")
-            except Exception as e:
-                logger.error(f"Error setting fullscreen mode: {e}. Attempting fallback.")
-                try:
-                    # Fallback to maximized state
-                    state = 'zoomed' if os.name == 'nt' else 'normal'
-                    self.state(state)
-                    self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
-                    logger.info("Fallback to maximized state successful.")
-                except Exception as fallback_e:
-                     logger.error(f"Error setting fallback maximized state: {fallback_e}")
-                     self.geometry(f"{config.APP_WIDTH}x{config.APP_HEIGHT}")
-                     logger.warning("Using configured window size as last resort.")
+            logger.info("Scheduling fullscreen mode...")
+            # Delay setting fullscreen slightly to allow window manager to initialize
+            self.after(100, self._apply_fullscreen)
         else:
             logger.info("Fullscreen mode is disabled in configuration.")
+
+    def _apply_fullscreen(self):
+        """Applies the fullscreen attribute, called after a short delay."""
+        logger.info("Attempting to apply fullscreen mode now...")
+        try:
+            self.attributes("-fullscreen", True)
+            logger.info("Fullscreen mode applied successfully.")
+        except Exception as e:
+            logger.error(f"Error applying fullscreen mode: {e}. Attempting fallback.")
+            try:
+                # Fallback to maximized state
+                state = 'zoomed' if os.name == 'nt' else 'normal'
+                self.state(state)
+                self.geometry(f"{self.winfo_screenwidth()}x{self.winfo_screenheight()}+0+0")
+                logger.info("Fallback to maximized state successful.")
+            except Exception as fallback_e: # Corrected indentation
+                logger.error(f"Error setting fallback maximized state: {fallback_e}")
+                # Apply configured size as last resort if fallback fails
+                self.geometry(f"{config.APP_WIDTH}x{config.APP_HEIGHT}")
+                logger.warning("Using configured window size as last resort.")
 
     def _setup_layout(self):
         """
@@ -209,9 +216,8 @@ class AppWindow(ctk.CTk):
             self.status_bar_frame.grid(row=current_row, column=0, sticky="ew")
             # Configure columns for status indicators (push to right)
             self.status_bar_frame.grid_columnconfigure(0, weight=1) # Spacer
-            self.status_bar_frame.grid_columnconfigure(1, weight=0) # Connection
-            self.status_bar_frame.grid_columnconfigure(2, weight=0) # API Limit
-            self.status_bar_frame.grid_columnconfigure(3, weight=0) # API Error
+            self.status_bar_frame.grid_columnconfigure(1, weight=0) # Network Status
+            self.status_bar_frame.grid_columnconfigure(2, weight=0) # API Status
             self.status_bar_frame.grid_propagate(False) # Prevent shrinking
             logger.debug("Status bar frame created.")
             current_row += 1
@@ -294,48 +300,30 @@ class AppWindow(ctk.CTk):
 
         indicator_font = self._get_font('status_indicator')
         text_color = self._get_color('status_text')
-        corner_radius = config.STATUS_INDICATOR_CORNER_RADIUS
-        padx = config.ELEMENT_PADDING['padx']
-        pady = config.ELEMENT_PADDING['pady']
+        padx = config.ELEMENT_PADDING['padx'] // 2 # Use smaller padding for persistent labels
+        pady = config.ELEMENT_PADDING['pady'] // 2
 
-        # --- Connection Indicator ---
-        self.connection_indicator = ctk.CTkLabel(
+        # --- Network Status Label ---
+        self.network_status_label = ctk.CTkLabel(
             self.status_bar_frame,
-            text=get_translation('no_internet', config.LANGUAGE),
+            text="Network: Pending", # Initial text
             font=indicator_font,
-            fg_color=self._get_color('status_no_connection_bg'),
             text_color=text_color,
-            corner_radius=corner_radius
+            anchor="e"
         )
-        self.connection_indicator.grid(row=0, column=1, sticky="e", padx=padx, pady=pady)
-        self.connection_indicator.grid_remove() # Hide initially
-        logger.debug("Connection indicator created.")
+        self.network_status_label.grid(row=0, column=1, sticky="e", padx=padx, pady=pady)
+        logger.debug("Network status label created.")
 
-        # --- API Limit Indicator ---
-        self.api_limit_indicator = ctk.CTkLabel(
+        # --- API Status Label ---
+        self.api_status_label = ctk.CTkLabel(
             self.status_bar_frame,
-            text=get_translation('api_limit', config.LANGUAGE),
+            text="API: Pending", # Initial text
             font=indicator_font,
-            fg_color=self._get_color('status_api_limit_bg'),
             text_color=text_color,
-            corner_radius=corner_radius
+            anchor="e"
         )
-        self.api_limit_indicator.grid(row=0, column=2, sticky="e", padx=padx, pady=pady)
-        self.api_limit_indicator.grid_remove() # Hide initially
-        logger.debug("API limit indicator created.")
-
-        # --- API Error Indicator ---
-        self.api_error_indicator = ctk.CTkLabel(
-            self.status_bar_frame,
-            text=get_translation('api_error', config.LANGUAGE),
-            font=indicator_font,
-            fg_color=self._get_color('status_api_error_bg'),
-            text_color=text_color,
-            corner_radius=corner_radius
-        )
-        self.api_error_indicator.grid(row=0, column=3, sticky="e", padx=padx, pady=pady)
-        self.api_error_indicator.grid_remove() # Hide initially
-        logger.debug("API error indicator created.")
+        self.api_status_label.grid(row=0, column=2, sticky="e", padx=padx, pady=pady)
+        logger.debug("API status label created.")
 
     def _create_time_date_region(self):
         """Creates widgets for the time and date display region."""
@@ -646,13 +634,17 @@ class AppWindow(ctk.CTk):
 
     def update_current_weather(self, weather_result: Dict[str, Any]):
         """Updates the current weather display section."""
-        logger.debug(f"Updating current weather display. API Status: {weather_result.get('api_status')}")
+        logger.debug(f"Updating current weather display. Received data keys: {list(weather_result.keys())}")
 
-        connection_status = weather_result.get('connection_status', False)
-        api_status = weather_result.get('api_status', 'error')
-        self.update_status_indicators(connection_status, api_status)
+        # Status indicators are updated separately by calls from main.py
+        # Do not call self.update_status_indicators from here.
 
         current_data = weather_result.get('data', {})
+        if not current_data:
+             logger.warning("Received empty 'data' dictionary in update_current_weather. Cannot update labels.")
+             # Optionally set labels to NA here if desired, but they should retain previous value otherwise.
+             # return # Or return early
+
         na_text = get_translation('not_available', config.LANGUAGE)
 
         # Update Temperature (Always shown)
@@ -678,15 +670,19 @@ class AppWindow(ctk.CTk):
                 # aqi_text = f"{translated_aqi} ({aqi_value})" if aqi_value is not None else translated_aqi
                 aqi_text = translated_aqi # Keep it simple for now
             self.air_quality_value.configure(text=aqi_text)
-            logger.debug(f"Air Quality updated to: {aqi_text}")
+            logger.debug(f"Air Quality updated to: {aqi_text}") # Corrected indentation
 
     def update_forecast(self, forecast_result: Dict[str, Any]):
-        """Updates the multi-day forecast display section."""
+        """
+        Updates the multi-day forecast display section.
+
+        Note: This method does NOT update the main status indicators itself.
+        Status updates are handled by `update_current_weather` (for IMS) and
+        the AccuWeather update cycle in `main.py` which calls
+        `update_status_indicators` directly.
+        """
         logger.debug(f"Updating forecast display. API Status: {forecast_result.get('api_status')}")
-        # Optionally update status based on forecast fetch status
-        # connection_status = forecast_result.get('connection_status', False)
-        # api_status = forecast_result.get('api_status', 'error')
-        # self.update_status_indicators(connection_status, api_status)
+        # We don't update the main status bar from here, as it's handled centrally
 
         forecast_data: List[Dict[str, Any]] = forecast_result.get('data', [])
         na_text = get_translation('not_available', config.LANGUAGE)
@@ -737,37 +733,79 @@ class AppWindow(ctk.CTk):
                 day_widgets['condition'].configure(text="")
                 day_widgets['temp'].configure(text="")
 
-    def update_status_indicators(self, connection_status: bool, api_status: str):
-        """Controls the visibility of the status indicators."""
+    def update_status_indicators(self, connection_status: bool, api_status: Optional[str], last_success_time: Optional[float]):
+        """
+        Updates the persistent status indicator labels for network and API status.
+
+        Args:
+            connection_status (bool): The current internet connection status.
+            api_status (Optional[str]): The status of the last relevant API call
+                                        ('ok', 'limit_reached', 'error', 'mock', 'offline', None).
+                                        None might indicate an initial state or IMS-only update.
+            last_success_time (Optional[float]): The timestamp (time.time()) of the
+                                                 last successful AccuWeather API call.
+                                                 None if no successful call yet or if the
+                                                 update is only for IMS.
+        """
         # Only proceed if status bar is enabled and widgets exist
-        if not self.status_bar_frame or not self.connection_indicator or \
-           not self.api_limit_indicator or not self.api_error_indicator:
-            # logger.debug("Status bar disabled or widgets missing, skipping indicator update.")
+        if not self.status_bar_frame or not self.network_status_label or not self.api_status_label:
             return
 
-        logger.debug(f"Updating status indicators: Connection={connection_status}, API Status='{api_status}'")
+        logger.debug(f"Updating status indicators: Connection={connection_status}, API Status='{api_status}', Last Success Time={last_success_time}")
 
-        # Hide all initially
-        self.connection_indicator.grid_remove()
-        self.api_limit_indicator.grid_remove()
-        self.api_error_indicator.grid_remove()
+        # --- Update Network Status Label ---
+        network_text = "Network: OK" if connection_status else "Network: Offline"
+        # TODO: Add localization for network status text
+        # TODO: Add color coding based on status (e.g., green for OK, red for Offline)
+        network_color = self._get_color("status_ok_text") if connection_status else self._get_color("status_error_text")
+        self.network_status_label.configure(text=network_text, text_color=network_color)
 
-        # Show the relevant one
-        if not connection_status:
-            logger.debug("Showing 'No Internet' indicator.")
-            self.connection_indicator.grid()
-            self.connection_indicator.lift()
+        # --- Update API Status Label ---
+        api_text = "API: Pending" # Default
+        api_color = self._get_color("status_text") # Default color
+
+        # Format the last success time if available
+        success_time_str = "--:--"
+        if last_success_time:
+            try:
+                success_time_str = datetime.fromtimestamp(last_success_time).strftime('%H:%M')
+            except Exception as e:
+                logger.error(f"Error formatting last success timestamp {last_success_time}: {e}")
+                success_time_str = "??:??" # Indicate formatting error
+
+        # Determine API status text and color
+        if api_status == 'ok':
+            # If last_success_time is None, it might be an IMS 'ok' status
+            time_suffix = f" ({success_time_str})" if last_success_time else ""
+            api_text = f"API: OK{time_suffix}"
+            api_color = self._get_color("status_ok_text")
         elif api_status == 'limit_reached':
-            logger.debug("Showing 'API Limit' indicator.")
-            self.api_limit_indicator.grid()
-            self.api_limit_indicator.lift()
+            api_text = f"API: Limit ({success_time_str})"
+            api_color = self._get_color("status_warning_text") # Use a warning color
         elif api_status == 'error':
-            logger.debug("Showing 'API Error' indicator.")
-            self.api_error_indicator.grid()
-            self.api_error_indicator.lift()
-        else: # 'ok', 'mock', etc. -> show nothing
-            logger.debug("API status OK/Mock/Other. Hiding API indicators.")
-            pass # All already hidden
+            api_text = f"API: Error ({success_time_str})"
+            api_color = self._get_color("status_error_text")
+        elif api_status == 'mock':
+            api_text = "API: Mock" # No time needed for mock
+            api_color = self._get_color("status_text") # Neutral color
+        elif api_status == 'offline': # This might be set by AccuWeatherClient if connection drops mid-fetch
+             api_text = f"API: Offline ({success_time_str})"
+             api_color = self._get_color("status_error_text")
+        elif api_status is None and last_success_time is None:
+             api_text = "API: Pending" # Initial state before first fetch
+             api_color = self._get_color("status_text")
+        elif api_status is None and last_success_time is not None:
+             # This case might occur if IMS update happens after a successful AccuWeather update
+             # Keep showing the last known AccuWeather status time
+             api_text = f"API: OK ({success_time_str})" # Assume OK if time exists but status is None
+             api_color = self._get_color("status_ok_text")
+        else:
+             # Catch any unexpected api_status values
+             api_text = f"API: {api_status} ({success_time_str})"
+             api_color = self._get_color("status_text")
+
+        # TODO: Add localization for API status prefixes ("API: OK", "API: Limit", etc.)
+        self.api_status_label.configure(text=api_text, text_color=api_color)
 
     def exit_fullscreen(self, event=None):
         """Callback to exit fullscreen mode."""
@@ -781,3 +819,10 @@ class AppWindow(ctk.CTk):
             logger.info("Exited fullscreen mode successfully.")
         except Exception as e:
             logger.error(f"Error encountered while exiting fullscreen mode: {e}")
+
+# --- Color Configuration (Placeholder - Define these in config.py) ---
+# Add placeholder color keys to config.ACTIVE_COLORS if they don't exist
+# Example additions to config.py's COLOR_THEME dictionaries:
+# 'status_ok_text': ('#00C853', '#4CAF50'),      # Greenish for OK
+# 'status_warning_text': ('#FFAB00', '#FFB300'), # Amber/Orange for Warning/Limit
+# 'status_error_text': ('#D50000', '#F44336'),   # Reddish for Error/Offline

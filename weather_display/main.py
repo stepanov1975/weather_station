@@ -197,6 +197,10 @@ class WeatherDisplayApp:
         self.last_aqi_data: Optional[Dict[str, Any]] = None
         logger.debug("Initialized last_aqi_data storage.")
 
+        # Store the timestamp of the last successful AccuWeather API call
+        self.last_accuweather_success_time: Optional[float] = None
+        logger.debug("Initialized last_accuweather_success_time storage.")
+
         logger.info("Weather Display application initialization complete.")
 
     def start(self):
@@ -633,20 +637,22 @@ class WeatherDisplayApp:
                     logger.error("Failed to fetch data from IMS service.")
                     # Keep api_status as 'error', connection_status is already False
 
-            # Prepare the payload for the GUI update function
-            update_payload = {
-                'data': current_weather_data,
-                'connection_status': connection_status,
-                'api_status': api_status # Status specific to this IMS fetch ('ok', 'error', 'mock')
-            }
-
             # Update GUI if it exists, ensuring it runs on the main thread
             if self.app_window:
+                # Prepare the payload for the main weather update
+                update_payload = {
+                    'data': current_weather_data,
+                    'connection_status': connection_status,
+                    'api_status': api_status # Status specific to this IMS fetch ('ok', 'error', 'mock')
+                }
                 # Use after(0, ...) to schedule the update on the main Tkinter event loop
                 # Pass a copy of the payload to avoid potential race conditions if the dict is modified later
                 self.app_window.after(0, lambda payload=update_payload.copy(): self.app_window.update_current_weather(payload))
-                # Also update the generic status indicators based on this fetch
-                self.app_window.after(0, lambda conn=connection_status, api=api_status: self.app_window.update_status_indicators(conn, api))
+
+                # Update the status indicators based *only* on this IMS fetch.
+                # Pass None for the AccuWeather success time, as this update doesn't involve it.
+                # The GUI method will need to handle this None value appropriately.
+                self.app_window.after(0, lambda conn=connection_status, api=api_status: self.app_window.update_status_indicators(conn, api, None)) # Pass None for last_success_time
 
             elif self.headless:
                  # Log fetched data details clearly in headless mode
@@ -713,14 +719,18 @@ class WeatherDisplayApp:
             final_conn_status = current_conn_status # Primarily based on current weather fetch attempt
             if current_api_status == 'ok' and forecast_api_status == 'ok':
                 final_api_status = 'ok'
+                # Update the last successful update time
+                self.last_accuweather_success_time = time.time()
+                logger.debug(f"Updated last AccuWeather success time to: {self.last_accuweather_success_time}")
             elif 'limit_reached' in [current_api_status, forecast_api_status]:
                 final_api_status = 'limit_reached'
             elif 'mock' in [current_api_status, forecast_api_status]:
                  final_api_status = 'mock' # If either uses mock data
+                 # Optionally clear success time if using mock? Or keep last real success? Keep for now.
             else:
                 final_api_status = 'error' # If any fetch resulted in an error
 
-            logger.info(f"AccuWeather overall update status: API={final_api_status}, Connection={final_conn_status}")
+            logger.info(f"AccuWeather overall update status: API={final_api_status}, Connection={final_conn_status}, Last Success Time: {self.last_accuweather_success_time}")
 
             # --- Store AQI data if fetch was successful ---
             if current_api_status == 'ok' and 'data' in current_result and current_result['data']:
@@ -757,10 +767,10 @@ class WeatherDisplayApp:
                  # Pass the full forecast result dictionary
                  self.app_window.after(0, lambda res=forecast_result.copy(): self.app_window.update_forecast(res))
 
-                 # Update the main status indicators based on the combined status
-                 self.app_window.after(0, lambda conn=final_conn_status, api=final_api_status: self.app_window.update_status_indicators(conn, api))
+                 # Update the main status indicators based on the combined status, passing the success time
+                 self.app_window.after(0, lambda conn=final_conn_status, api=final_api_status, success_time=self.last_accuweather_success_time: self.app_window.update_status_indicators(conn, api, success_time))
 
-                 logger.debug("Scheduled AccuWeather GUI updates (Current Weather/AQI & Forecast).")
+                 logger.debug("Scheduled AccuWeather GUI updates (Current Weather/AQI, Forecast, Status).")
 
             elif self.headless:
                  # Log summary in headless mode
@@ -776,10 +786,10 @@ class WeatherDisplayApp:
 
         except Exception as e:
             logger.error(f"Unexpected error during AccuWeather update cycle: {e}", exc_info=True)
-            # Attempt to update GUI status indicators to reflect the error
+            # Attempt to update GUI status indicators to reflect the error, passing the last known success time
             if self.app_window:
-                 # Schedule update to show error status
-                 self.app_window.after(0, lambda: self.app_window.update_status_indicators(False, 'error'))
+                 # Schedule update to show error status, but include the last success time if available
+                 self.app_window.after(0, lambda success_time=self.last_accuweather_success_time: self.app_window.update_status_indicators(False, 'error', success_time))
             # Update internal connection status tracker if error implies disconnection
             if self.last_connection_status:
                  logger.warning("Connection status likely changed to Disconnected due to AccuWeather update error.")

@@ -48,3 +48,13 @@
 - **GUI Refactoring:**
     - Overhauled `gui/app_window.py` to use a modular, configuration-driven approach based on CustomTkinter.
     - Significantly expanded `config.py` with detailed UI settings (layout, fonts, colors, padding, margins, optional elements).
+- **API Optimization & Caching (April 19, 2025 - Update 4):**
+    - Implemented conditional fetching for AQI in `services/weather_api.py` based on `config.OPTIONAL_ELEMENTS`.
+    - Added persistent file caching for current weather and forecast data in `services/weather_api.py` (`current_weather_cache.json`, `forecast_cache.json`).
+- **Status Indicator Improvements (April 19, 2025 - Update 5):**
+    - Modified `main.py` to track and pass the last successful AccuWeather update time.
+    - Refactored status indicators in `gui/app_window.py` to be persistent, displaying network status and detailed API status (including last success time).
+- **Bug Fixes (April 19, 2025 - Update 5):**
+    - Corrected `TypeError` in `gui/app_window.py` caused by incorrect parameters passed to `update_status_indicators`.
+    - Fixed indentation errors in `gui/app_window.py` related to fullscreen logic.
+    - Implemented delayed fullscreen application in `gui/app_window.py` using `self.after()` for better compatibility.

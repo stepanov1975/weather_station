@@ -24,7 +24,7 @@ Provides a dedicated, always-on display for essential time, date, and detailed w
     - Detailed UI appearance: dark/light mode, specific colors, fonts for various elements, padding, margins, corner radii.
     - Layout structure: Relative heights of UI regions.
     - Optional elements: Show/hide status bar, humidity, AQI.
-- **Status Indicators:** Displays status for internet connection and AccuWeather API health (limit reached, errors) - can be hidden via config.
+- **Status Indicators:** Persistently displays the current network connection status ("Network: OK" / "Network: Offline") and the status of the last AccuWeather API call ("API: OK", "API: Limit", "API: Error", etc.), including the time of the last successful call. Can be hidden via config (`OPTIONAL_ELEMENTS['show_status_bar']`).
 - **Localization:** Supports English ('en') and Russian ('ru') for UI text, dates, and weather descriptions.
 
 ## 3. User Experience Goals
