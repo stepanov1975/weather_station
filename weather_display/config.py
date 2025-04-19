@@ -158,7 +158,7 @@ FONTS = {
     "current_temp_title": (None, 30, "bold"), # "Temperature" label
     "current_humidity_value": (None, 80, "bold"), # Current humidity value
     "current_humidity_title": (None, 30, "bold"), # "Humidity" label
-    "current_aqi_value": (None, 50, "bold"), # Air Quality Index value/category
+    "current_aqi_value": (None, 40, "bold"), # Air Quality Index value/category
     "current_aqi_title": (None, 30, "bold"), # "Air Quality" label
     "forecast_day": (None, 40, "bold"), # Day name in forecast (e.g., "Mon")
     "forecast_condition": (None, 35, "normal"), # Weather condition text in forecast
