@@ -27,6 +27,7 @@
 - **Logging:**
     - Updated logging configuration in `main.py` to use `TimedRotatingFileHandler` for daily log rotation at midnight, keeping 7 backups, while retaining console output.
     - Added `try...except` block around file handler initialization in `main.py` to catch and log potential errors (e.g., permissions) to the console, aiding diagnosis if file logging fails.
+- **Startup Optimization:** Modified `main.py` to prioritize using valid cached AccuWeather data on initial startup (`_initial_accuweather_update` method) instead of forcing an immediate API call. Periodic updates still force refresh.
 
 ## 3. Next Steps
 

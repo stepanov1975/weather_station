@@ -260,7 +260,7 @@ class WeatherDisplayApp:
             if self.ims_weather:
                 self._update_weather() # Initial IMS weather fetch and display
             if self.accuweather_client:
-                self._update_accuweather_data() # Initial AccuWeather fetch and display
+                self._initial_accuweather_update() # Use cache-aware initial AccuWeather fetch
 
             logger.info("Starting GUI main loop (Tkinter)...")
             # Start the Tkinter main event loop. This call blocks until the window
@@ -826,6 +826,106 @@ class WeatherDisplayApp:
                  self.last_connection_status = False
 
         logger.info("AccuWeather data update cycle finished.")
+
+    def _initial_accuweather_update(self):
+        """
+        Fetches initial AccuWeather data, prioritizing valid cache.
+
+        Similar to _update_accuweather_data, but calls service methods without
+        force_refresh=True, allowing the use of cached data if available and valid.
+        This is intended for the application startup sequence.
+        """
+        if not self.accuweather_client:
+            logger.debug("Skipping initial AccuWeather update: client not initialized.")
+            return
+
+        logger.info("Attempting initial AccuWeather update (prioritizing cache)...")
+        current_result: Dict[str, Any] = {}
+        forecast_result: Dict[str, Any] = {}
+        final_api_status = 'error' # Assume error until successful fetches
+        final_conn_status = False # Assume disconnected until successful fetches
+
+        try:
+            # Fetch current weather (includes AQI), allow cache use
+            current_result = self.accuweather_client.get_current_weather(force_refresh=False) # Prioritize cache
+            current_api_status = current_result.get('api_status', 'error')
+            current_conn_status = current_result.get('connection_status', False)
+            logger.info(f"Initial AccuWeather current weather fetch status: {current_api_status}, Connection: {current_conn_status}")
+            logger.debug(f"Initial AccuWeather current data received: {current_result.get('data', {})}")
+
+            # Fetch forecast data, allow cache use
+            forecast_result = self.accuweather_client.get_forecast(force_refresh=False) # Prioritize cache
+            forecast_api_status = forecast_result.get('api_status', 'error')
+            logger.info(f"Initial AccuWeather forecast fetch status: {forecast_api_status}")
+            logger.debug(f"Initial AccuWeather forecast data count: {len(forecast_result.get('data', []))}")
+
+            # Determine overall status based on both fetches
+            final_conn_status = current_conn_status # Primarily based on current weather fetch attempt
+            if current_api_status == 'ok' and forecast_api_status == 'ok':
+                final_api_status = 'ok'
+                # Update the last successful update time ONLY if we didn't use cache for both
+                # (i.e., if an actual API call was made for either current or forecast)
+                # The service methods return 'cache_hit': True if cache was used.
+                current_cache_hit = current_result.get('cache_hit', False)
+                forecast_cache_hit = forecast_result.get('cache_hit', False)
+                if not (current_cache_hit and forecast_cache_hit):
+                    self.last_accuweather_success_time = time.time()
+                    logger.debug(f"Updated last AccuWeather success time during initial fetch: {self.last_accuweather_success_time}")
+                else:
+                    logger.debug("Initial AccuWeather data loaded entirely from cache, not updating success time.")
+            elif 'limit_reached' in [current_api_status, forecast_api_status]:
+                final_api_status = 'limit_reached'
+            elif 'mock' in [current_api_status, forecast_api_status]:
+                 final_api_status = 'mock'
+            else:
+                final_api_status = 'error'
+
+            logger.info(f"Initial AccuWeather overall update status: API={final_api_status}, Connection={final_conn_status}, Last Success Time: {self.last_accuweather_success_time}")
+
+            # --- Store AQI data if fetch was successful ---
+            # (Logic remains the same as _update_accuweather_data)
+            if current_api_status == 'ok' and 'data' in current_result and current_result['data']:
+                aqi_category = current_result['data'].get('air_quality_category')
+                aqi_index = current_result['data'].get('air_quality_index')
+                if aqi_category is not None:
+                    self.last_aqi_data = {
+                        'air_quality_category': aqi_category,
+                        'air_quality_index': aqi_index
+                    }
+                    logger.debug(f"Stored latest AQI data from initial fetch: {self.last_aqi_data}")
+                else:
+                    if self.last_aqi_data is not None:
+                         logger.debug("Clearing stale AQI data during initial fetch.")
+                         self.last_aqi_data = None
+            elif current_api_status != 'ok' and current_api_status != 'mock':
+                 pass # Keep last known good AQI
+
+            # --- Schedule GUI Updates (if GUI exists) ---
+            if self.app_window:
+                 self.app_window.after(0, lambda res=current_result.copy(): self.app_window.update_current_weather(res))
+                 self.app_window.after(0, lambda res=forecast_result.copy(): self.app_window.update_forecast(res))
+                 self.app_window.after(0, lambda conn=final_conn_status, api=final_api_status, success_time=self.last_accuweather_success_time: self.app_window.update_status_indicators(conn, api, success_time))
+                 logger.debug("Scheduled initial AccuWeather GUI updates.")
+
+            elif self.headless:
+                 logger.info(f"Headless Initial AccuWeather Update:")
+                 logger.info(f"  Current Data: {current_result.get('data', {})}")
+                 logger.info(f"  Forecast Data Count: {len(forecast_result.get('data', []))}")
+                 logger.info(f"  Overall Status: API={final_api_status}, Connection={final_conn_status}")
+
+            if self.last_connection_status != final_conn_status:
+                 logger.debug(f"Overall connection status updated based on initial AccuWeather fetch: {'Connected' if final_conn_status else 'Disconnected'}")
+                 self.last_connection_status = final_conn_status
+
+        except Exception as e:
+            logger.error(f"Unexpected error during initial AccuWeather update: {e}", exc_info=True)
+            if self.app_window:
+                 self.app_window.after(0, lambda success_time=self.last_accuweather_success_time: self.app_window.update_status_indicators(False, 'error', success_time))
+            if self.last_connection_status:
+                 logger.warning("Connection status likely changed to Disconnected due to initial AccuWeather update error.")
+                 self.last_connection_status = False
+
+        logger.info("Initial AccuWeather data update finished.")
 
 
 # --- Command Line Argument Parsing ---

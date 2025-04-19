@@ -51,6 +51,7 @@
 - **Key Bugs Fixed:** Addressed `TypeError` in `update_status_indicators` call, indentation errors in fullscreen logic. Previous fixes for date parsing, icon loading, `NameError`, and `get_day_name` arguments remain.
 - **Documentation Updated:** Memory Bank files are being updated to reflect the latest changes.
 - **Logging:** Configured daily rotating file logging (`weather_display.log`) in `main.py` with error handling for file handler initialization.
+- **Startup Behavior:** Initial AccuWeather data fetch now prioritizes cache (`_initial_accuweather_update` in `main.py`).
 
 ## 4. Known Issues
 
@@ -79,3 +80,5 @@
 - **April 19, 2025 (Update 8 - Logging Rotation & Error Handling):**
     - Replaced basic file logging with `TimedRotatingFileHandler` in `main.py` for daily log rotation at midnight.
     - Added `try...except` block to catch and log errors during file handler setup.
+- **April 19, 2025 (Update 9 - Startup Cache):**
+    - Modified `main.py` to use cached AccuWeather data on initial startup if available and valid, instead of forcing an immediate API call.
