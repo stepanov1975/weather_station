@@ -1,8 +1,13 @@
 """
-Time Service for the Weather Display application.
+Time Service for the Weather Display Application.
 
-Provides methods to retrieve the current time and date, formatted according
-to the application's localization settings.
+This module provides the `TimeService` class, which offers static methods
+to retrieve the current system time and date. It ensures consistent formatting
+and utilizes the application's localization settings for date representation.
+
+The primary purpose is to centralize time/date retrieval logic, making it easy
+to manage and potentially extend (e.g., adding timezone support if needed,
+although currently relies on system time).
 """
 
 import logging
@@ -10,53 +15,83 @@ from datetime import datetime
 from typing import Tuple
 
 # Local application imports
-from .. import config
-from ..utils.localization import get_formatted_date
+from .. import config # To access the configured LANGUAGE setting
+from ..utils.localization import get_formatted_date # For localized date formatting
 
+# Get a logger instance specific to this module
 logger = logging.getLogger(__name__)
 
 class TimeService:
     """
-    A service class providing static methods for time and date retrieval.
+    Provides static methods for retrieving formatted current time and date.
 
-    This class encapsulates the logic for getting the current time and date,
-    ensuring consistent formatting and leveraging the localization module.
+    This class acts as a utility wrapper around standard datetime functions,
+    integrating with the application's configuration and localization utilities
+    to provide consistently formatted and potentially localized time/date strings.
+    All methods are static, meaning an instance of the class is not required.
     """
 
     @staticmethod
     def get_current_time() -> str:
         """
-        Get the current time formatted as HH:MM:SS.
+        Gets the current system time formatted as HH:MM:SS.
+
+        Uses the standard `datetime.now()` and formats it using `strftime`.
 
         Returns:
-            The current time string (e.g., "14:35:02").
+            str: The current time as a string in "HH:MM:SS" format (e.g., "14:35:02").
         """
-        return datetime.now().strftime('%H:%M:%S')
+        now = datetime.now()
+        time_str = now.strftime('%H:%M:%S')
+        logger.debug(f"Retrieved current time: {time_str}")
+        return time_str
 
     @staticmethod
     def get_current_date() -> str:
         """
-        Get the current date, formatted according to the configured language.
+        Gets the current system date, formatted according to the configured language.
 
-        Uses the `get_formatted_date` utility function for localization.
+        Delegates the formatting logic to the `get_formatted_date` utility function
+        from the localization module, passing the language code defined in `config.py`.
 
         Returns:
-            The formatted date string (e.g., "Thursday, 04 May 2025" or
-            "Четверг, 4 Мая 2025").
+            str: The current date formatted as a localized string (e.g., for 'en':
+                 "Thursday, 04 May 2025"; for 'ru': "Четверг, 4 Мая 2025").
+                 Format depends on the implementation in `utils.localization`.
         """
-        return get_formatted_date(config.LANGUAGE)
+        language_code = config.LANGUAGE
+        date_str = get_formatted_date(language_code)
+        logger.debug(f"Retrieved formatted date for language '{language_code}': {date_str}")
+        return date_str
 
     @staticmethod
     def get_current_datetime() -> Tuple[str, str]:
         """
-        Get both the current time and the formatted current date.
+        Gets both the current time (HH:MM:SS) and the formatted, localized current date.
+
+        This is a convenience method that calls `get_current_time` and
+        `get_current_date` to retrieve both values efficiently.
 
         Returns:
-            A tuple containing the time string (HH:MM:SS) and the
-            localized date string.
+            Tuple[str, str]: A tuple containing:
+                             - The current time string ("HH:MM:SS").
+                             - The current localized date string.
         """
+        # It's slightly more efficient to get datetime.now() once
         now = datetime.now()
         time_str = now.strftime('%H:%M:%S')
-        # Reuse get_current_date for consistency
+        # Reuse the static method for date formatting to ensure consistency
         date_str = TimeService.get_current_date()
+        logger.debug(f"Retrieved current datetime: Time='{time_str}', Date='{date_str}'")
         return time_str, date_str
+
+# Example usage (if run directly)
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.DEBUG) # Enable logging for testing
+    print("Testing TimeService...")
+    current_time = TimeService.get_current_time()
+    print(f"Current Time: {current_time}")
+    current_date = TimeService.get_current_date()
+    print(f"Current Date (Lang: {config.LANGUAGE}): {current_date}")
+    time_tuple, date_tuple = TimeService.get_current_datetime()
+    print(f"Current DateTime Tuple: ('{time_tuple}', '{date_tuple}')")

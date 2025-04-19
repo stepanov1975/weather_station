@@ -1,30 +1,40 @@
-# Product Context: Weather Claude
+# Product Context: Weather Display for Raspberry Pi 4
 
 ## 1. Problem Solved
 
-Users often need quick access to current weather conditions and forecasts without opening a web browser or a dedicated mobile app. A simple, readily available desktop application provides this convenience.
+Provides a dedicated, always-on display for essential time, date, and detailed weather information, suitable for a kiosk or desktop environment, particularly on a Raspberry Pi 4. It aggregates data from multiple sources (AccuWeather for forecasts/AQI, IMS for local Israeli conditions) for a comprehensive view without needing manual interaction with web browsers or mobile apps.
 
-## 2. Desired Functionality
+## 2. Core Functionality (Current State)
 
-- **Core:** Display current temperature, weather description (e.g., "Sunny", "Cloudy"), and a representative weather icon for a configured location.
-- **Potential Enhancements:**
-    - Display additional details like "feels like" temperature, humidity, wind speed.
-    - Show a short-term forecast (e.g., next few hours or days).
-    - Allow the user to configure the location easily.
-    - Automatically detect user location (optional).
-    - Support multiple locations (optional).
+- **Time & Date Display:** Shows current time (HH:MM) and fully formatted, localized date (Weekday, Day Month Year).
+- **Current Weather Display:**
+    - Temperature (°C) - Primarily from IMS (Israel Meteorological Service) for frequent local updates.
+    - Humidity (%) - Primarily from IMS.
+    - Air Quality Index (AQI) - Category description (e.g., "Good", "Moderate") from AccuWeather (requires appropriate API plan).
+- **Forecast Display:** Shows a 3-day forecast fetched from AccuWeather, including:
+    - Localized day name.
+    - Weather icon representing the day's conditions.
+    - Localized weather condition description.
+    - High/Low temperature range (°C).
+- **Dual API Integration:** Fetches data from both AccuWeather and IMS services.
+- **GUI:** Clean, touch-optimized interface (using CustomTkinter) with configurable dark/light themes. Supports fullscreen and windowed modes.
+- **Configuration:** Allows setting AccuWeather location, IMS station name, language, update intervals, and UI appearance via `config.py`.
+- **Status Indicators:** Displays status for internet connection and AccuWeather API health (limit reached, errors).
+- **Localization:** Supports English ('en') and Russian ('ru') for UI text, dates, and weather descriptions.
 
 ## 3. User Experience Goals
 
-- **Simplicity:** The interface should be clean, uncluttered, and easy to understand at a glance.
-- **Accessibility:** Information should be clearly presented.
-- **Reliability:** Weather data should be up-to-date and accurate.
-- **Low Friction:** Minimal configuration required to get started.
+- **At-a-Glance Information:** Present key time, date, and weather data clearly and concisely.
+- **Reliability:** Provide up-to-date information by combining frequent local updates (IMS) with broader forecasts (AccuWeather). Handle API errors and connection issues gracefully.
+- **Customization:** Allow users to configure location, language, and appearance to suit their needs.
+- **Platform Suitability:** Optimized for running on a Raspberry Pi 4 with a touchscreen, potentially in a kiosk setup.
+- **Low Friction:** Easy setup with clear instructions for API key handling and configuration.
 
 ## 4. Target User Journey
 
-1. User launches the application.
-2. Application displays the weather for the default/configured location.
-3. (Optional) User accesses settings to change the location.
-4. User quickly glances at the app to get the needed weather information.
-5. User closes or minimizes the application.
+1.  User sets up the application on a Raspberry Pi 4 (or similar Linux system), providing an AccuWeather API key and configuring location/IMS station in `config.py`.
+2.  User runs the application (potentially configured to auto-start on boot).
+3.  Application launches (typically fullscreen) and displays the combined weather information for the configured locations/sources.
+4.  User glances at the display periodically to get time, date, current conditions, AQI, and forecast information.
+5.  Application runs continuously, updating data in the background and showing status indicators if issues arise.
+6.  (Optional) User exits fullscreen (Escape key) or stops the application if needed.

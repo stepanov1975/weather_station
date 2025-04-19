@@ -1,16 +1,27 @@
 """
-Utilities Package for Weather Display.
+Utilities Package for the Weather Display Application.
 
-This package contains various helper modules for tasks such as localization,
-API request handling, image processing, icon management, etc.
+This package aggregates various helper modules and utility functions that
+support the core functionality of the application but don't belong to a
+specific domain like 'gui' or 'services'.
+
+Modules included provide functionalities such as:
+- `helpers`: General-purpose helper functions (e.g., network checks, date parsing).
+- `icon_handler`: Loading, caching, and managing weather icons.
+- `localization`: Handling multi-language text translations and date formatting.
+
+This `__init__.py` file marks the directory as a Python package. It can also
+be used to selectively expose commonly used utilities at the package level for
+convenience, although direct imports from the specific utility modules are often
+preferred for clarity.
 """
 
-# Optionally expose specific utility classes/functions at the package level.
-# Example: Making WeatherIconHandler available as `from weather_display.utils import WeatherIconHandler`
-# However, direct imports like `from weather_display.utils.icon_handler import WeatherIconHandler`
-# are often clearer. Decide based on package usage patterns.
+# Example of exposing a class at the package level:
+# This allows `from weather_display.utils import WeatherIconHandler`
 from .icon_handler import WeatherIconHandler
 
-# You could add other commonly used utilities here if desired, e.g.:
-# from .helpers import fetch_with_retry
+# Other commonly used utilities could potentially be exposed here as well,
+# but weigh convenience against the explicitness of direct module imports.
+# e.g.,
+# from .helpers import check_internet_connection
 # from .localization import get_translation

@@ -1,59 +1,77 @@
 """
-Localization module for the Weather Display application.
+Localization Utilities for the Weather Display Application.
 
-Provides functions for translating text keys, formatting dates,
-and translating specific weather data (conditions, AQI categories)
-based on the selected language defined in `config.py`.
+This module centralizes all functionality related to multi-language support.
+It provides:
+- A master dictionary (`TRANSLATIONS`) holding text translations for various UI
+  elements and messages, keyed by language code (e.g., 'en', 'ru').
+- Mappings for translating specific data received from APIs (like AccuWeather
+  AQI categories and weather condition phrases) into standardized internal keys,
+  which are then used to look up translations in `TRANSLATIONS`.
+- Functions to retrieve translations (`get_translation`).
+- Functions to translate specific data types (`translate_aqi_category`,
+  `translate_weather_condition`).
+- Functions for formatting dates according to language conventions, using
+  manually defined mappings for day and month names (`get_formatted_date`,
+  `get_day_name_localized`).
+
+The application's display language is determined by the `LANGUAGE` setting in
+`config.py`.
 """
 
 import logging
-import locale
+import locale # Standard library for locale-specific operations (currently unused but potentially useful)
 from datetime import datetime
 from typing import Dict, Optional
 
+# Get a logger instance specific to this module
 logger = logging.getLogger(__name__)
 
 # ==============================================================================
 # Language Definitions and Translations
 # ==============================================================================
 
-# Dictionary mapping language codes to their display names (optional)
+# Dictionary mapping supported language codes to their display names (optional, for reference)
 LANGUAGES: Dict[str, str] = {
     'en': 'English',
     'ru': 'Russian'
+    # Add other supported languages here
 }
 
-# Master dictionary holding all translations, keyed by language code.
+# Master dictionary holding all translations.
+# Structure: TRANSLATIONS[language_code][translation_key] = translated_string
 TRANSLATIONS: Dict[str, Dict[str, str]] = {
+    # --- English Translations ---
     'en': {
-        # App title
+        # App Info
         'app_title': 'Weather Display',
 
-        # Weather sections/labels
+        # UI Labels / Sections
         'current_weather': 'Current Weather',
         'temperature': 'Temperature',
         'humidity': 'Humidity',
         'air_quality': 'Air Quality',
+        'forecast': 'Forecast', # Added forecast title if needed
 
-        # Air quality levels (map keys for AccuWeather categories)
+        # Air Quality Index (AQI) Levels (Keys match ACCUWEATHER_AQI_CATEGORY_MAP values)
         'air_good': 'Good',
         'air_moderate': 'Moderate',
         'air_unhealthy_sensitive': 'Unhealthy for Sensitive Groups',
         'air_unhealthy': 'Unhealthy',
         'air_very_unhealthy': 'Very Unhealthy',
         'air_hazardous': 'Hazardous',
-        'air_unknown': 'Unknown AQI', # More specific than just 'Unknown'
+        'air_unknown': 'Unknown AQI', # Specific key for unknown/missing AQI
 
-        # General UI text
+        # General UI Text & Statuses
         'not_available': 'N/A',
         'icon_missing': 'Icon Missing',
-        'day': 'Day', # Used in forecast frame titles if needed
-        'unknown': 'Unknown', # General unknown value
+        'day': 'Day', # Generic 'Day' label
+        'unknown': 'Unknown', # General unknown value fallback
         'no_internet': 'No Internet Connection',
         'api_limit_reached': 'API Limit Reached',
-        'api_error': 'API Error', # Added for general API errors
+        'api_error': 'API Error', # General API error status
 
-        # Day names (full) - Used by get_formatted_date, get_day_name_localized
+        # Day Names (Full) - Used by date formatting functions
         'monday': 'Monday',
         'tuesday': 'Tuesday',
         'wednesday': 'Wednesday',
@@ -62,7 +80,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'saturday': 'Saturday',
         'sunday': 'Sunday',
 
-        # Month names (full) - Used by get_formatted_date
+        # Month Names (Full) - Used by date formatting functions
         'january': 'January',
         'february': 'February',
         'march': 'March',
@@ -76,11 +94,11 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'november': 'November',
         'december': 'December',
 
-        # Weather conditions (map keys for API responses)
-        # Note: This list should cover expected phrases from the weather API.
-        # It might need expansion based on observed API responses.
+        # Weather Condition Phrases (Keys match WEATHER_CONDITION_MAP values)
+        # These should cover expected phrases from the weather API (e.g., AccuWeather).
+        # Expand this list based on observed API responses.
         'sunny': 'Sunny',
-        'partly_cloudy': 'Partly Cloudy', # Covers "Partly cloudy"
+        'partly_cloudy': 'Partly Cloudy',
         'cloudy': 'Cloudy',
         'overcast': 'Overcast',
         'mist': 'Mist',
@@ -115,18 +133,21 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'windy': 'Windy', # AccuWeather specific?
         'hazy_moonlight': 'Hazy Moonlight', # AccuWeather specific?
         # Add night variations if needed, or handle day/night logic elsewhere
+        # e.g., 'partly_cloudy_night': 'Partly Cloudy Night'
     },
+    # --- Russian Translations ---
     'ru': {
-        # App title
+        # App Info
         'app_title': 'Прогноз Погоды',
 
-        # Weather sections/labels
+        # UI Labels / Sections
         'current_weather': 'Текущая Погода',
         'temperature': 'Температура',
         'humidity': 'Влажность',
         'air_quality': 'Качество Воздуха',
+        'forecast': 'Прогноз',
 
-        # Air quality levels
+        # Air Quality Index (AQI) Levels
         'air_good': 'Хорошее',
         'air_moderate': 'Умеренное',
         'air_unhealthy_sensitive': 'Вредно для чувствительных групп',
@@ -135,16 +156,16 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'air_hazardous': 'Опасное',
         'air_unknown': 'Качество неизвестно',
 
-        # General UI text
-        'not_available': 'Н/Д',
+        # General UI Text & Statuses
+        'not_available': 'Н/Д', # Not Available abbreviation
         'icon_missing': 'Нет иконки',
         'day': 'День',
         'unknown': 'Неизвестно',
         'no_internet': 'Нет подключения к Интернету',
         'api_limit_reached': 'Достигнут лимит API',
-        'api_error': 'Ошибка API', # Added for general API errors
+        'api_error': 'Ошибка API',
 
-        # Day names (full)
+        # Day Names (Full)
         'monday': 'Понедельник',
         'tuesday': 'Вторник',
         'wednesday': 'Среда',
@@ -153,7 +174,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'saturday': 'Суббота',
         'sunday': 'Воскресенье',
 
-        # Month names (genitive case for Russian date format)
+        # Month Names (Genitive case for Russian date format "DD Month YYYY")
         'january': 'Января',
         'february': 'Февраля',
         'march': 'Марта',
@@ -167,7 +188,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'november': 'Ноября',
         'december': 'Декабря',
 
-        # Weather conditions
+        # Weather Condition Phrases
         'sunny': 'Солнечно',
         'partly_cloudy': 'Переменная облачность',
         'cloudy': 'Облачно',
@@ -196,7 +217,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'flurries': 'Снежные заряды',
         'snow': 'Снег',
         'ice': 'Лед',
-        'sleet': 'Мокрый снег',
+        'sleet': 'Мокрый снег', # Often used for sleet in Russian
         'freezing_rain': 'Ледяной дождь',
         'rain_and_snow': 'Дождь со снегом',
         'hot': 'Жарко',
@@ -204,76 +225,98 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'windy': 'Ветрено',
         'hazy_moonlight': 'Луна в дымке',
     }
+    # Add other languages here...
 }
 
 # ==============================================================================
-# Manual Date/Time Name Mappings
+# Manual Date/Time Name Mappings (Alternative to locale)
 # ==============================================================================
-# NOTE: Using locale.setlocale and datetime.strftime with locale-specific
-# format codes (like %A for weekday, %B for month) might be a more robust
-# alternative if the required locales are reliably available on the system.
-# However, manual mapping provides explicit control.
+# Using manual dictionaries provides explicit control over day/month names,
+# avoiding potential issues with locale availability or inconsistent formatting
+# across different systems, especially relevant for embedded devices like RPi.
 
-# Day name mapping (0=Monday, 6=Sunday, matching datetime.weekday())
-# Defined directly with strings to avoid module-level function calls during import.
+# Day name mapping: datetime.weekday() (0=Monday) -> localized string
 DAY_NAMES: Dict[str, Dict[int, str]] = {
     'en': {
-        0: 'Monday', 1: 'Tuesday', 2: 'Wednesday', 3: 'Thursday',
-        4: 'Friday', 5: 'Saturday', 6: 'Sunday'
+        0: TRANSLATIONS['en']['monday'], 1: TRANSLATIONS['en']['tuesday'],
+        2: TRANSLATIONS['en']['wednesday'], 3: TRANSLATIONS['en']['thursday'],
+        4: TRANSLATIONS['en']['friday'], 5: TRANSLATIONS['en']['saturday'],
+        6: TRANSLATIONS['en']['sunday']
     },
     'ru': {
-        0: 'Понедельник', 1: 'Вторник', 2: 'Среда', 3: 'Четверг',
-        4: 'Пятница', 5: 'Суббота', 6: 'Воскресенье'
+        0: TRANSLATIONS['ru']['monday'], 1: TRANSLATIONS['ru']['tuesday'],
+        2: TRANSLATIONS['ru']['wednesday'], 3: TRANSLATIONS['ru']['thursday'],
+        4: TRANSLATIONS['ru']['friday'], 5: TRANSLATIONS['ru']['saturday'],
+        6: TRANSLATIONS['ru']['sunday']
     }
 }
 
-# Month name mapping (1=January, 12=December)
-# Defined directly with strings.
+# Month name mapping: datetime.month (1=January) -> localized string
 MONTH_NAMES: Dict[str, Dict[int, str]] = {
     'en': {
-        1: 'January', 2: 'February', 3: 'March', 4: 'April', 5: 'May',
-        6: 'June', 7: 'July', 8: 'August', 9: 'September', 10: 'October',
-        11: 'November', 12: 'December'
+        1: TRANSLATIONS['en']['january'], 2: TRANSLATIONS['en']['february'],
+        3: TRANSLATIONS['en']['march'], 4: TRANSLATIONS['en']['april'],
+        5: TRANSLATIONS['en']['may'], 6: TRANSLATIONS['en']['june'],
+        7: TRANSLATIONS['en']['july'], 8: TRANSLATIONS['en']['august'],
+        9: TRANSLATIONS['en']['september'], 10: TRANSLATIONS['en']['october'],
+        11: TRANSLATIONS['en']['november'], 12: TRANSLATIONS['en']['december']
     },
     'ru': { # Using genitive case for Russian format "DD Month YYYY"
-        1: 'Января', 2: 'Февраля', 3: 'Марта', 4: 'Апреля', 5: 'Мая',
-        6: 'Июня', 7: 'Июля', 8: 'Августа', 9: 'Сентября', 10: 'Октября',
-        11: 'Ноября', 12: 'Декабря'
+        1: TRANSLATIONS['ru']['january'], 2: TRANSLATIONS['ru']['february'],
+        3: TRANSLATIONS['ru']['march'], 4: TRANSLATIONS['ru']['april'],
+        5: TRANSLATIONS['ru']['may'], 6: TRANSLATIONS['ru']['june'],
+        7: TRANSLATIONS['ru']['july'], 8: TRANSLATIONS['ru']['august'],
+        9: TRANSLATIONS['ru']['september'], 10: TRANSLATIONS['ru']['october'],
+        11: TRANSLATIONS['ru']['november'], 12: TRANSLATIONS['ru']['december']
     }
 }
 
 # ==============================================================================
-# Translation Functions
+# Core Translation Function
 # ==============================================================================
 
 def get_translation(key: str, language: str = 'en') -> str:
     """
-    Retrieve translation for a given key in the specified language.
+    Retrieves the translation for a given key in the specified language.
 
-    Falls back to English if the specified language is not found.
-    Returns the key itself if the key is not found in the target language.
+    Looks up the `key` in the `TRANSLATIONS` dictionary for the target `language`.
+    If the `language` itself is not found in `TRANSLATIONS`, it falls back to 'en'.
+    If the `key` is not found within the selected language dictionary (or the
+    English fallback), the original `key` string is returned as a last resort,
+    and a warning is logged.
 
     Args:
-        key: The translation key (string).
-        language: The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
+        key (str): The unique identifier for the text to be translated (e.g.,
+                   'app_title', 'temperature', 'air_good').
+        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
 
     Returns:
-        The translated string, or the key if no translation exists.
+        str: The translated string corresponding to the key in the specified
+             language (or English fallback), or the key itself if no translation
+             is found anywhere.
     """
-    if language not in TRANSLATIONS:
+    # Determine the language dictionary to use (target or fallback to English)
+    lang_dict = TRANSLATIONS.get(language)
+    if lang_dict is None:
         logger.warning(
-            f"Language '{language}' not supported in TRANSLATIONS. "
-            f"Falling back to English."
+            f"Language code '{language}' not found in TRANSLATIONS. "
+            f"Falling back to English ('en')."
         )
-        language = 'en'
+        lang_dict = TRANSLATIONS.get('en', {}) # Use English or empty dict if even 'en' is missing
 
-    # Get the dictionary for the target language (or English as fallback)
-    lang_dict = TRANSLATIONS.get(language, TRANSLATIONS['en'])
-    translation = lang_dict.get(key, key) # Return key if not found
+    # Look up the key in the selected language dictionary
+    translation = lang_dict.get(key)
 
-    if translation == key and key not in TRANSLATIONS['en'].get(key, key):
-         # Log if key is missing in both target and fallback language
-         logger.warning(f"Translation key '{key}' not found for language '{language}' or fallback 'en'.")
+    # If key not found in target language, try fallback English
+    if translation is None and language != 'en':
+        logger.debug(f"Key '{key}' not found for language '{language}'. Trying English fallback.")
+        lang_dict_fallback = TRANSLATIONS.get('en', {})
+        translation = lang_dict_fallback.get(key)
+
+    # If key is still not found, return the key itself and log a warning
+    if translation is None:
+         logger.warning(f"Translation key '{key}' not found for language '{language}' or fallback 'en'. Returning the key itself.")
+         return key # Return the original key as the ultimate fallback
 
     return translation
 
@@ -281,68 +324,84 @@ def get_translation(key: str, language: str = 'en') -> str:
 # Specific Data Translation Maps and Functions
 # ==============================================================================
 
-# --- Air Quality Index (AQI) ---
+# --- Air Quality Index (AQI) Category Translation ---
 
-# Mapping from AccuWeather API AQI Category strings to our internal translation keys
-# This allows decoupling API response values from our translation structure.
+# This map translates the category strings received directly from the AccuWeather API
+# (e.g., "Good", "Moderate") into the internal translation keys used in the
+# `TRANSLATIONS` dictionary (e.g., "air_good", "air_moderate"). This decouples
+# the API's specific wording from the application's internal translation system.
 ACCUWEATHER_AQI_CATEGORY_MAP: Dict[str, str] = {
+    # Case-sensitive keys matching expected API responses
     "Good": "air_good",
     "Moderate": "air_moderate",
     "Unhealthy for Sensitive Groups": "air_unhealthy_sensitive",
     "Unhealthy": "air_unhealthy",
     "Very Unhealthy": "air_very_unhealthy",
     "Hazardous": "air_hazardous",
-    "Excellent": "air_good", # Added mapping for "Excellent" category
-    # Add more mappings here if AccuWeather uses other category names
+    "Excellent": "air_good", # Map "Excellent" to the same key as "Good"
+    # Add more mappings here if other categories are observed from AccuWeather API
 }
 
 def translate_aqi_category(category: Optional[str], language: str = 'en') -> str:
     """
-    Translate an AccuWeather AQI category string into the specified language.
+    Translates an AccuWeather AQI category string into the specified language.
 
-    Uses the ACCUWEATHER_AQI_CATEGORY_MAP to find the appropriate translation key.
+    Uses the `ACCUWEATHER_AQI_CATEGORY_MAP` to find the internal translation key
+    corresponding to the API's category string, then uses `get_translation`
+    to retrieve the text in the target language.
 
     Args:
-        category: AQI category text from AccuWeather API (e.g., "Good", "Moderate").
-                  Can be None if data is unavailable.
-        language: The target language code. Defaults to 'en'.
+        category (Optional[str]): The AQI category string received from the
+                                  AccuWeather API (e.g., "Good", "Moderate").
+                                  Can be None if AQI data is unavailable.
+        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
 
     Returns:
-        The translated AQI category string, or a localized "Unknown AQI" string
-        if the category is None, or the original category string if it's not
-        found in the mapping.
+        str: The translated AQI category string (e.g., "Хорошее"). Returns a
+             localized "Unknown AQI" string if the input `category` is None.
+             Returns the original `category` string if it's not found in the
+             `ACCUWEATHER_AQI_CATEGORY_MAP`.
     """
     if category is None:
-        # If the input category itself is None, return the translation for 'unknown'
+        # Handle cases where AQI data might be missing entirely
+        logger.debug("translate_aqi_category called with None category. Returning 'unknown'.")
         return get_translation('air_unknown', language)
 
-    # Find the translation key corresponding to the API category string
+    # Find the internal translation key corresponding to the API category string
     translation_key = ACCUWEATHER_AQI_CATEGORY_MAP.get(category)
 
     if translation_key:
-        # If a mapping exists, return the translation for that key
-        return get_translation(translation_key, language)
+        # If a mapping exists, get the translation for that key
+        translated_text = get_translation(translation_key, language)
+        logger.debug(f"Translated AQI category '{category}' (key: '{translation_key}') to '{translated_text}' for language '{language}'.")
+        return translated_text
     else:
-        # If no mapping exists for the category, return the original category string
-        logger.warning(f"No translation mapping found for AQI category: '{category}'. Returning original.")
+        # If the category string from the API is not in our map, log a warning
+        # and return the original, untranslated string. This helps identify
+        # new or unexpected categories from the API.
+        logger.warning(
+            f"No translation mapping found in ACCUWEATHER_AQI_CATEGORY_MAP for "
+            f"AQI category: '{category}'. Returning the original string."
+        )
         return category
 
-# --- Weather Conditions ---
+# --- Weather Condition Phrase Translation ---
 
-# Mapping from common weather condition phrases (expected from API)
-# to our internal translation keys. Case-insensitive matching is used.
-# This map might need expansion based on actual API responses.
+# This map attempts to translate common weather condition phrases (expected from API)
+# into internal translation keys. Matching is case-insensitive and currently uses
+# a simple substring check, which might need refinement for more complex conditions.
+# Keys should be lowercase for consistent matching.
 WEATHER_CONDITION_MAP: Dict[str, str] = {
     # General
     'sunny': 'sunny',
-    'partly cloudy': 'partly_cloudy', # Covers "Partly cloudy"
+    'partly cloudy': 'partly_cloudy', # Covers "Partly cloudy" and variations
     'cloudy': 'cloudy',
     'overcast': 'overcast',
     'mist': 'mist',
     'fog': 'fog',
     'clear': 'clear', # Often used for night
-    'rain': 'rain',
-    'snow': 'snow',
+    'rain': 'rain', # General rain, might be overridden by more specific types
+    'snow': 'snow', # General snow
     'windy': 'windy',
     # Rain variations
     'light rain': 'light_rain',
@@ -350,157 +409,217 @@ WEATHER_CONDITION_MAP: Dict[str, str] = {
     'heavy rain': 'heavy_rain',
     'patchy rain': 'patchy_rain',
     'patchy rain nearby': 'patchy_rain_nearby',
-    'showers': 'showers',
+    'showers': 'showers', # Often used by AccuWeather
     'freezing rain': 'freezing_rain',
     # Snow variations
     'light snow': 'light_snow',
     'moderate snow': 'moderate_snow',
     'heavy snow': 'heavy_snow',
     'patchy snow': 'patchy_snow',
-    'flurries': 'flurries',
+    'flurries': 'flurries', # AccuWeather specific?
     'sleet': 'sleet',
     'rain and snow': 'rain_and_snow',
     # Storms
     'thunderstorm': 'thunderstorm',
-    't-storms': 't_storms', # Abbreviation
+    't-storms': 't_storms', # Abbreviation often used by AccuWeather
     # AccuWeather specific / Other
     'mostly sunny': 'mostly_sunny',
     'intermittent clouds': 'intermittent_clouds',
     'hazy sunshine': 'hazy_sunshine',
     'mostly cloudy': 'mostly_cloudy',
-    'dreary': 'dreary',
+    'dreary': 'dreary', # AccuWeather specific?
     'ice': 'ice',
     'hot': 'hot',
     'cold': 'cold',
     'hazy moonlight': 'hazy_moonlight',
-    # Add more conditions as observed from API responses
+    # Add more conditions as observed from API responses (e.g., night variations if needed)
+    # 'partly cloudy night': 'partly_cloudy_night', # Example
 }
 
 def translate_weather_condition(condition: Optional[str], language: str = 'en') -> str:
     """
-    Translate a weather condition phrase into the specified language.
+    Translates a weather condition phrase (from API) into the specified language.
 
-    Performs a case-insensitive search for the condition phrase within the
-    WEATHER_CONDITION_MAP keys. Returns the original condition if no match is found.
+    Performs a case-insensitive search for the best match of the input `condition`
+    phrase within the keys of the `WEATHER_CONDITION_MAP`. If a match is found,
+    it retrieves the corresponding translation key and returns the translated text
+    using `get_translation`. If no match is found, it returns the original condition
+    string.
+
+    Note: The current matching logic is basic (substring check, preferring longer
+    matches). It might require refinement for complex or ambiguous condition phrases.
 
     Args:
-        condition: Weather condition text from the API (e.g., "Sunny", "Partly cloudy").
-                   Can be None.
-        language: The target language code. Defaults to 'en'.
+        condition (Optional[str]): The weather condition text received from the API
+                                   (e.g., "Sunny", "Partly cloudy", "Showers").
+                                   Can be None.
+        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
 
     Returns:
-        The translated weather condition string, or the original condition string
-        if no translation key is found, or a localized "Unknown" string if input is None.
+        str: The translated weather condition string (e.g., "Солнечно"). Returns the
+             original `condition` string if no translation key is found in the map.
+             Returns a localized "Unknown" string if the input `condition` is None.
     """
     if condition is None:
+        logger.debug("translate_weather_condition called with None condition. Returning 'unknown'.")
         return get_translation('unknown', language)
 
-    condition_lower = condition.lower()
+    condition_lower = condition.lower().strip()
+    logger.debug(f"Attempting to translate weather condition: '{condition}' (lowercase: '{condition_lower}')")
 
-    # Search for the best match in the map keys (case-insensitive)
-    # This simple approach might need refinement if conditions are ambiguous
-    # (e.g., "Patchy light rain" vs "Light rain").
-    # Consider prioritizing longer matches or using regex if needed.
-    matched_key = None
-    for map_key_lower, translation_key in WEATHER_CONDITION_MAP.items():
+    # --- Find Best Match in Map ---
+    # Simple strategy: iterate through map, find if key is a substring of the condition,
+    # prefer the longest matching key found.
+    best_match_key: Optional[str] = None
+    for map_key_lower in WEATHER_CONDITION_MAP.keys():
+        # Check if the map key (e.g., 'partly cloudy') is present in the input condition
         if map_key_lower in condition_lower:
-            # Basic check: if we already found a match, prefer the longer one
-            if matched_key is None or len(map_key_lower) > len(matched_key):
-                 matched_key = map_key_lower
+            # If this is the first match, or a longer match than previously found, store it.
+            if best_match_key is None or len(map_key_lower) > len(best_match_key):
+                 best_match_key = map_key_lower
+                 logger.debug(f"  Potential match found: map key '{map_key_lower}' in condition '{condition_lower}'. Current best match.")
 
-    if matched_key:
-        translation_key = WEATHER_CONDITION_MAP[matched_key]
-        return get_translation(translation_key, language)
+    # --- Translate Using Best Match or Return Original ---
+    if best_match_key:
+        translation_key = WEATHER_CONDITION_MAP[best_match_key]
+        translated_text = get_translation(translation_key, language)
+        logger.info(f"Translated condition '{condition}' (matched key: '{best_match_key}', translation key: '{translation_key}') to '{translated_text}' for language '{language}'.")
+        return translated_text
     else:
+        # If no key in our map was found within the input condition string
         logger.warning(
-            f"No translation mapping found for weather condition: '{condition}'. "
-            f"Returning original."
+            f"No translation mapping found in WEATHER_CONDITION_MAP for weather condition: "
+            f"'{condition}'. Returning the original string."
         )
-        # Return the original, untranslated condition if no match
+        # Return the original, untranslated condition string from the API
         return condition
 
 # ==============================================================================
-# Date/Time Formatting Functions (using manual maps)
+# Date/Time Formatting Functions (Using Manual Mappings)
 # ==============================================================================
 
 def get_formatted_date(language: str = 'en') -> str:
     """
-    Get the current date formatted according to the specified language.
+    Gets the current system date formatted into a string based on language conventions.
 
-    Uses the manually defined DAY_NAMES and MONTH_NAMES dictionaries.
+    Uses the manually defined `DAY_NAMES` and `MONTH_NAMES` dictionaries for
+    localization, providing explicit control over the output format.
 
     Args:
-        language: The target language code. Defaults to 'en'.
+        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
 
     Returns:
-        Formatted date string (e.g., "Thursday, 27 March 2025" or
-        "Четверг, 27 Марта 2025").
+        str: A formatted date string according to the language's convention.
+             Examples:
+             - 'en': "Thursday, 4 May 2023"
+             - 'ru': "Четверг, 4 Мая 2023"
+             Returns an error string if names are missing.
     """
     now = datetime.now()
-    day_names_dict = DAY_NAMES.get(language, DAY_NAMES['en'])
-    month_names_dict = MONTH_NAMES.get(language, MONTH_NAMES['en'])
+    logger.debug(f"Formatting date for language: {language}")
 
-    day_name = day_names_dict.get(now.weekday(), get_translation('unknown', language))
-    month_name = month_names_dict.get(now.month, get_translation('unknown', language))
+    # Get the appropriate name dictionaries, falling back to English if needed
+    day_names_dict = DAY_NAMES.get(language, DAY_NAMES.get('en', {}))
+    month_names_dict = MONTH_NAMES.get(language, MONTH_NAMES.get('en', {}))
 
-    # Format based on language convention (simple example)
+    # Get the localized names using the current date's weekday/month numbers
+    day_name = day_names_dict.get(now.weekday()) # 0=Monday
+    month_name = month_names_dict.get(now.month) # 1=January
+
+    # Handle cases where names might be missing from the dictionaries
+    if day_name is None:
+        logger.error(f"Missing day name for weekday {now.weekday()} in language '{language}'.")
+        day_name = get_translation('unknown', language)
+    if month_name is None:
+        logger.error(f"Missing month name for month {now.month} in language '{language}'.")
+        month_name = get_translation('unknown', language)
+
+    # Construct the final formatted string based on language conventions
+    # Add more language-specific formats here if needed.
     if language == 'ru':
         # Russian format: "Weekday, DD Month(genitive) YYYY"
-        return f"{day_name}, {now.day} {month_name} {now.year}"
+        formatted_date = f"{day_name}, {now.day} {month_name} {now.year}"
     else:
         # Default/English format: "Weekday, DD Month YYYY"
-        return f"{day_name}, {now.day} {month_name} {now.year}"
+        formatted_date = f"{day_name}, {now.day} {month_name} {now.year}"
+
+    logger.debug(f"Formatted date: {formatted_date}")
+    return formatted_date
 
 
-def get_day_name_localized(date_str: str, language: str = 'en') -> str:
+def get_day_name_localized(date_str: Optional[str], language: str = 'en') -> str:
     """
-    Get the localized day name from a date string ('YYYY-MM-DD').
+    Gets the localized full day name (e.g., "Monday") from a date string.
 
-    Uses the manually defined DAY_NAMES dictionary.
+    Parses the input date string, attempting common formats (ISO 8601 with 'T',
+    or simple 'YYYY-MM-DD'). Uses the manually defined `DAY_NAMES` dictionary
+    for translation based on the `language` code.
 
     Args:
-        date_str: Date string in 'YYYY-MM-DD' format.
-        language: The target language code. Defaults to 'en'.
+        date_str (Optional[str]): A date string, ideally in ISO 8601 format
+                                  (e.g., "2023-10-27T10:00:00+03:00") or simple
+                                  "YYYY-MM-DD" format. Can be None.
+        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
 
     Returns:
-        Localized full day name (e.g., 'Monday', 'Понедельник'), or a
-        localized "Unknown" string if parsing fails or the day is invalid.
+        str: The localized full name of the day of the week (e.g., 'Monday',
+             'Понедельник'). Returns a localized "Unknown" string if the input
+             is None or the date string cannot be parsed into a valid date.
     """
-    try:
-        # Handle full ISO 8601 timestamp by extracting only the date part
-        date_part = date_str.split('T')[0]
-        date_obj = datetime.strptime(date_part, '%Y-%m-%d')
-        weekday = date_obj.weekday()  # 0 = Monday, 6 = Sunday
+    if date_str is None:
+        logger.debug("get_day_name_localized called with None date_str.")
+        return get_translation('unknown', language)
 
-        day_names_dict = DAY_NAMES.get(language, DAY_NAMES['en'])
-        return day_names_dict.get(weekday, get_translation('unknown', language))
+    try:
+        # Handle full ISO 8601 timestamp by extracting only the date part before parsing
+        date_part = date_str.split('T')[0]
+        # Parse the date part into a datetime object
+        date_obj = datetime.strptime(date_part, '%Y-%m-%d')
+        # Get the weekday number (0=Monday, 6=Sunday)
+        weekday_index = date_obj.weekday()
+
+        # Get the appropriate day names dictionary, falling back to English
+        day_names_dict = DAY_NAMES.get(language, DAY_NAMES.get('en', {}))
+        # Look up the day name using the index
+        day_name = day_names_dict.get(weekday_index)
+
+        if day_name:
+            logger.debug(f"Determined day name for '{date_str}' in '{language}': {day_name}")
+            return day_name
+        else:
+            # This should only happen if DAY_NAMES dictionary is incomplete
+            logger.error(f"Day name not found in dictionary for index {weekday_index}, language '{language}'.")
+            return get_translation('unknown', language)
+
     except (ValueError, TypeError) as e:
-        logger.error(f"Could not parse date string '{date_str}' to get day name: {e}")
+        # Log error if the date string cannot be parsed
+        logger.error(f"Could not parse date string '{date_str}' to determine day name: {e}")
         return get_translation('unknown', language)
 
 
 # ==============================================================================
-# Deprecated/Unused Functions (Marked for Review)
+# Deprecated/Unused Functions (Marked for Review/Removal)
 # ==============================================================================
 
 def get_air_quality_text_localized(index: int, language: str = 'en') -> str:
     """
-    Convert air quality index to localized descriptive text (DEPRECATED?).
+    DEPRECATED: Converts an old AQI index (1-6) to localized descriptive text.
 
-    NOTE: This mapping is based on the old WeatherAPI.com index (1-6).
-          It is likely unused as AccuWeather provides category names directly,
-          which are translated by `translate_aqi_category`.
-          Review usage and consider removing this function.
+    WARNING: This function uses a mapping based on the old WeatherAPI.com index
+             system (1-6). The application now primarily uses category strings
+             (e.g., "Good", "Moderate") from AccuWeather, which are translated
+             by the `translate_aqi_category` function. This function is likely
+             unused and should be removed after verifying it's not called anywhere.
 
     Args:
-        index: Air quality index (1-6).
-        language: The target language code. Defaults to 'en'.
+        index (int): Air quality index (expected 1-6 based on old system).
+        language (str): The target language code. Defaults to 'en'.
 
     Returns:
-        Localized descriptive text for the air quality.
+        str: Localized descriptive text for the air quality index.
     """
-    # Mapping based on WeatherAPI.com AQI index (1-6)
-    aqi_keys = {
+    # Mapping based on the old WeatherAPI.com AQI index (1-6)
+    aqi_keys_deprecated = {
         1: 'air_good',
         2: 'air_moderate',
         3: 'air_unhealthy_sensitive',
@@ -508,6 +627,8 @@ def get_air_quality_text_localized(index: int, language: str = 'en') -> str:
         5: 'air_very_unhealthy',
         6: 'air_hazardous'
     }
-    logger.warning("Call to potentially deprecated function: get_air_quality_text_localized")
-    key = aqi_keys.get(index, 'air_unknown')
+    logger.warning("Call to DEPRECATED function: get_air_quality_text_localized. This likely needs removal.")
+    # Find the translation key based on the old index
+    key = aqi_keys_deprecated.get(index, 'air_unknown')
+    # Return the translation using the standard function
     return get_translation(key, language)
