@@ -179,10 +179,10 @@ class AppWindow(ctk.CTk):
         self.grid_columnconfigure(0, weight=1)
         # Row 0: Connection status bar - fixed height, no vertical expansion
         self.grid_rowconfigure(0, weight=0)
-        # Row 1: Top Frame (Time/Date/Current) - takes proportionally more space
-        self.grid_rowconfigure(1, weight=2) # e.g., 2/3 of remaining space
-        # Row 2: Bottom Frame (Forecast) - takes remaining space
-        self.grid_rowconfigure(2, weight=1) # e.g., 1/3 of remaining space
+        # Row 1: Top Frame (Time/Date/Current) - takes 1/3 of remaining space
+        self.grid_rowconfigure(1, weight=1) # 1/3 of remaining space
+        # Row 2: Bottom Frame (Forecast) - takes 2/3 of remaining space
+        self.grid_rowconfigure(2, weight=2) # 2/3 of remaining space
 
         # --- Create Main Container Frames ---
         # Connection Status Bar (at the very top)
@@ -309,7 +309,9 @@ class AppWindow(ctk.CTk):
                 # Combine base size and increase from config for large font
                 size=config.TIME_FONT_SIZE_BASE + config.TIME_FONT_SIZE_INCREASE,
                 weight="bold" # Make time bold
-            )
+            ),
+            anchor="center",
+            justify="center"
         )
         # Place in the top-left grid cell of the top_frame, allowing it to expand
         self.time_label.grid(
