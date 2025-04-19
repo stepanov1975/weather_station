@@ -19,27 +19,36 @@ APP_HEIGHT = 810  # Initial window height in pixels
 FULLSCREEN = True  # Run in fullscreen mode if True
 # Update interval for the time display (affects clock refresh rate)
 UPDATE_INTERVAL_SECONDS = 1
-# Update interval for fetching new weather data from the API
-WEATHER_UPDATE_INTERVAL_MINUTES = 60
+# Update interval for fetching new weather data from the IMS API
+IMS_UPDATE_INTERVAL_MINUTES = 10
+# Update interval for fetching new weather data from the AccuWeather API
+ACCUWEATHER_UPDATE_INTERVAL_MINUTES = 120
 
 # ==============================================================================
 # Location Settings
 # ==============================================================================
-# Location query string used for the weather API (e.g., "City,Country")
+# Location query string (retained for potential future use or display)
 LOCATION = "Hadera,Israel"
+
+# ==============================================================================
+# API Settings (IMS - Israel Meteorological Service)
+# ==============================================================================
+# Station name for the IMS service (e.g., "En Hahoresh", "Tel Aviv Coast")
+IMS_STATION_NAME = "En Hahoresh"
+# IMS service URL (defined within the service class, but kept here for reference)
+# IMS_URL = "https://ims.gov.il/sites/default/files/ims_data/xml_files/imslasthour.xml"
 
 # ==============================================================================
 # API Settings (AccuWeather)
 # ==============================================================================
-# Load API key from environment variable 'ACCUWEATHER_API_KEY'.
-# Defaults to None if the environment variable is not set.
-# Can be overridden by the --api-key command-line argument in main.py.
-ACCUWEATHER_API_KEY = os.environ.get("ACCUWEATHER_API_KEY")
-# Base URL for AccuWeather API endpoints.
+# Base URL for the AccuWeather API endpoints
 ACCUWEATHER_BASE_URL = "http://dataservice.accuweather.com"
-# Old settings for WeatherAPI.com (commented out for reference)
-# WEATHER_API_KEY = ""
-# WEATHER_API_URL = "https://api.weatherapi.com/v1"
+# AccuWeather API Key - **IMPORTANT**: Best practice is to set this via environment
+# variable (ACCUWEATHER_API_KEY) rather than hardcoding it here.
+# The AccuWeatherClient will prioritize the key passed via command line (--api-key),
+# then this config value, then the environment variable.
+ACCUWEATHER_API_KEY = os.environ.get('ACCUWEATHER_API_KEY') # Read from environment
+
 
 # ==============================================================================
 # UI Settings
@@ -91,4 +100,5 @@ STATUS_INDICATOR_CORNER_RADIUS = 5  # Corner radius for status indicators
 # Mock Data Settings
 # ==============================================================================
 # Use mock data for testing UI without making live API calls
+# Note: Mock data structure might need adjustment for IMS service
 USE_MOCK_DATA = False

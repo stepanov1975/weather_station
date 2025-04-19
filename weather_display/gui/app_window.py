@@ -49,10 +49,10 @@ class AppWindow(ctk.CTk):
         icon_handler (WeatherIconHandler): Instance for loading weather icons.
         connection_frame (ctk.CTkFrame): Top bar for status indicators.
         top_frame (ctk.CTkFrame): Upper section containing time, date, current weather.
-        bottom_frame (ctk.CTkFrame): Lower section containing the forecast.
+        bottom_frame (ctk.CTkFrame): Lower section for the forecast. # Restored
         # Widget references (add type hints)
         connection_indicator (ctk.CTkLabel): Label for internet status.
-        api_limit_indicator (ctk.CTkLabel): Label for API limit status.
+        api_limit_indicator (ctk.CTkLabel): Label for API limit status. # Restored
         api_error_indicator (ctk.CTkLabel): Label for general API error status.
         time_label (ctk.CTkLabel): Label displaying the current time.
         weekday_label (ctk.CTkLabel): Label for the day of the week.
@@ -66,11 +66,10 @@ class AppWindow(ctk.CTk):
         humidity_frame (ctk.CTkFrame): Frame for humidity display.
         humidity_title (ctk.CTkLabel): Title for humidity.
         humidity_value (ctk.CTkLabel): Value label for humidity.
-        air_quality_frame (ctk.CTkFrame): Frame for AQI display.
-        air_quality_title (ctk.CTkLabel): Title for AQI.
-        air_quality_value (ctk.CTkLabel): Value label for AQI.
-        forecast_frames (List[Dict[str, ctk.CTkLabel]]): List of dictionaries,
-            each holding widget references for a single forecast day.
+        air_quality_frame (ctk.CTkFrame): Frame for AQI display. # Restored
+        air_quality_title (ctk.CTkLabel): Title for AQI. # Restored
+        air_quality_value (ctk.CTkLabel): Value label for AQI. # Restored
+        forecast_frames (List[Dict[str, ctk.CTkLabel]]): List holding widgets for each forecast day. # Restored
     """
 
     def __init__(self):
@@ -122,8 +121,10 @@ class AppWindow(ctk.CTk):
         # Configure root window grid
         self.grid_columnconfigure(0, weight=1) # Single column stretches
         self.grid_rowconfigure(0, weight=0)  # Connection status bar (fixed height)
-        self.grid_rowconfigure(1, weight=1)  # Top frame (time, date, current) - expands
-        self.grid_rowconfigure(2, weight=1)  # Bottom frame (forecast) - expands
+        # Row 1 (Top Frame) takes roughly 2/3 space
+        self.grid_rowconfigure(1, weight=2) # Adjusted weight
+        # Row 2 (Bottom Frame) takes roughly 1/3 space
+        self.grid_rowconfigure(2, weight=1) # Restored
 
         # --- Create Main Frames ---
         # Connection Status Bar (Top)
@@ -131,11 +132,13 @@ class AppWindow(ctk.CTk):
             self, corner_radius=0, height=config.CONNECTION_FRAME_HEIGHT
         )
         self.connection_frame.grid(row=0, column=0, sticky="ew")
-        # Configure columns: 0 expands (spacer), 1, 2, 3 are for indicators
+        # Configure columns: 0 expands (spacer), 1, 2 are for indicators
         self.connection_frame.grid_columnconfigure(0, weight=1) # Spacer column pushes indicators right
         self.connection_frame.grid_columnconfigure(1, weight=0) # Connection indicator
-        self.connection_frame.grid_columnconfigure(2, weight=0) # API Limit indicator
-        self.connection_frame.grid_columnconfigure(3, weight=0) # API Error indicator
+        # Column 2 is API Limit indicator
+        self.connection_frame.grid_columnconfigure(2, weight=0) # Restored
+        # Column 3 is API Error indicator
+        self.connection_frame.grid_columnconfigure(3, weight=0) # Added
         self.connection_frame.grid_propagate(False) # Prevent resizing by content
 
         # Top Section (Time, Date, Current Weather)
@@ -147,14 +150,14 @@ class AppWindow(ctk.CTk):
         # Row 0 for Time/Date - allow vertical expansion for centering content
         self.top_frame.grid_rowconfigure(0, weight=1)
         # Row 1 for Current Weather - allow expansion
-        self.top_frame.grid_rowconfigure(1, weight=2)
+        self.top_frame.grid_rowconfigure(1, weight=2) # Adjusted weight slightly
 
-        # Bottom Section (Forecast)
+        # Bottom Section (Forecast) - Restored
         self.bottom_frame = ctk.CTkFrame(self, corner_radius=0, fg_color="transparent")
-        self.bottom_frame.grid(row=2, column=0, sticky="nsew")
-        # Configure bottom_frame grid for 3 forecast days
+        self.bottom_frame.grid(row=2, column=0, sticky="nsew", padx=config.SECTION_PADDING_X, pady=config.SECTION_PADDING_Y)
+        # Configure 3 columns for 3 forecast days
         self.bottom_frame.grid_columnconfigure((0, 1, 2), weight=1)
-        self.bottom_frame.grid_rowconfigure(0, weight=1) # Single row expands
+        self.bottom_frame.grid_rowconfigure(0, weight=1) # Single row for forecast frames
 
     def _create_widgets(self):
         """Create and place all UI widgets by calling helper methods."""
@@ -162,7 +165,7 @@ class AppWindow(ctk.CTk):
         self._create_time_display()
         self._create_date_display()
         self._create_current_weather_display()
-        self._create_forecast_display()
+        self._create_forecast_display() # Restored call
 
     def _create_status_bar(self):
         """Create widgets for the connection status bar."""
@@ -182,10 +185,10 @@ class AppWindow(ctk.CTk):
         )
         self.connection_indicator.grid_remove() # Hide initially
 
-        # API Limit Indicator
+        # API Limit Indicator - Restored
         self.api_limit_indicator = ctk.CTkLabel(
             self.connection_frame,
-            text=get_translation('api_limit_reached', config.LANGUAGE),
+            text=get_translation('api_limit', config.LANGUAGE), # Use specific key
             font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.STATUS_INDICATOR_FONT_SIZE),
             fg_color=config.API_LIMIT_COLOR,
             text_color=config.STATUS_TEXT_COLOR,
@@ -285,8 +288,8 @@ class AppWindow(ctk.CTk):
             padx=config.SECTION_PADDING_X, pady=config.SECTION_PADDING_Y
         )
         # Configure grid for Temp, Humidity, AQI columns
-        self.current_weather_frame.grid_columnconfigure((0, 1, 2), weight=1)
-        self.current_weather_frame.grid_rowconfigure(0, weight=0)  # Title row
+        self.current_weather_frame.grid_columnconfigure((0, 1, 2), weight=1) # Restored 3 columns
+        self.current_weather_frame.grid_rowconfigure(0, weight=0)  # Title row (unused now?)
         self.current_weather_frame.grid_rowconfigure(1, weight=1)  # Content row
 
         # --- Temperature ---
@@ -321,7 +324,7 @@ class AppWindow(ctk.CTk):
         )
         self.humidity_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
 
-        # --- Air Quality ---
+        # --- Air Quality --- Restored
         self.air_quality_frame = ctk.CTkFrame(self.current_weather_frame)
         self.air_quality_frame.grid(row=1, column=2, sticky="nsew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
         self.air_quality_frame.grid_rowconfigure(0, weight=0)
@@ -333,50 +336,50 @@ class AppWindow(ctk.CTk):
         self.air_quality_title.grid(row=0, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
         self.air_quality_value = ctk.CTkLabel(
             self.air_quality_frame, text="--",
-            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE, weight="bold")
+            font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.WEATHER_FONT_SIZE + 40, weight="bold")
         )
         self.air_quality_value.grid(row=1, column=0, sticky="n", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
 
-    def _create_forecast_display(self):
+    def _create_forecast_display(self): # Restored method definition
         """Create frames and labels for the 3-day forecast section."""
         self.forecast_frames: List[Dict[str, ctk.CTkLabel]] = []
-        for i in range(3): # Assuming 3 forecast days
-            forecast_frame = ctk.CTkFrame(self.bottom_frame)
-            forecast_frame.grid(
-                row=0, column=i, sticky="nsew",
-                padx=config.SECTION_PADDING_X, pady=config.SECTION_PADDING_Y
-            )
-            # Configure rows within each forecast frame
-            forecast_frame.grid_rowconfigure(0, weight=0)  # Day title
-            forecast_frame.grid_rowconfigure(1, weight=1)  # Icon (expand vertically)
-            forecast_frame.grid_rowconfigure(2, weight=0)  # Condition text
-            forecast_frame.grid_rowconfigure(3, weight=0)  # Temperature text
+        na_text = get_translation('not_available', config.LANGUAGE)
 
-            # Create labels for this day's forecast
+        for i in range(3): # Create 3 forecast day frames
+            frame = ctk.CTkFrame(self.bottom_frame)
+            frame.grid(row=0, column=i, sticky="nsew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+            # Configure grid within each forecast frame
+            frame.grid_columnconfigure(0, weight=1) # Single column
+            frame.grid_rowconfigure(0, weight=0) # Day name
+            frame.grid_rowconfigure(1, weight=1) # Icon
+            frame.grid_rowconfigure(2, weight=0) # Condition text
+            frame.grid_rowconfigure(3, weight=0) # Temp range
+
+            # Create widgets for the forecast day
             day_label = ctk.CTkLabel(
-                forecast_frame, text=f"{get_translation('day', config.LANGUAGE)} {i+1}",
+                frame, text=f"Day {i+1}",
                 font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE, weight="bold")
             )
-            day_label.grid(row=0, column=0, sticky="ew", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+            day_label.grid(row=0, column=0, pady=(config.TEXT_PADDING_Y * 2, config.TEXT_PADDING_Y))
 
-            icon_label = ctk.CTkLabel(forecast_frame, text="") # Placeholder for icon
-            icon_label.grid(row=1, column=0, sticky="", padx=config.ELEMENT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+            icon_label = ctk.CTkLabel(frame, text="", image=None) # Placeholder for icon
+            icon_label.grid(row=1, column=0, pady=config.ELEMENT_PADDING_Y)
 
             condition_label = ctk.CTkLabel(
-                forecast_frame, text="--",
-                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE)
+                frame, text=na_text,
+                font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE),
+                wraplength=frame.winfo_width() - 20 # Adjust wrap length dynamically if needed
             )
-            condition_label.grid(row=2, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.TEXT_PADDING_Y)
+            condition_label.grid(row=2, column=0, pady=config.TEXT_PADDING_Y)
 
             temp_label = ctk.CTkLabel(
-                forecast_frame, text="--°C / --°C",
+                frame, text="--° / --°",
                 font=ctk.CTkFont(family=config.FONT_FAMILY, size=config.FORECAST_FONT_SIZE)
             )
-            temp_label.grid(row=3, column=0, sticky="ew", padx=config.TEXT_PADDING_X, pady=config.ELEMENT_PADDING_Y)
+            temp_label.grid(row=3, column=0, pady=(config.TEXT_PADDING_Y, config.TEXT_PADDING_Y * 2))
 
-            # Store references to the labels for easy updating
             self.forecast_frames.append({
-                'frame': forecast_frame, # Keep frame ref if needed for hiding
+                'frame': frame,
                 'day': day_label,
                 'icon': icon_label,
                 'condition': condition_label,
@@ -475,19 +478,21 @@ class AppWindow(ctk.CTk):
         humidity = current_data.get('humidity')
         self.humidity_value.configure(text=f"{humidity}%" if humidity is not None else na_text)
 
-        # Update air quality
+        # Update air quality - Restored
         aqi_category = current_data.get('air_quality_category')
+        aqi_value = current_data.get('air_quality_index')
         if aqi_category is not None:
+            # Translate the category using the localization utility
             translated_aqi = translate_aqi_category(aqi_category, config.LANGUAGE)
-            aqi_index = current_data.get('air_quality_index')
-            display_text = f"{translated_aqi}" if aqi_index is not None else translated_aqi
-            self.air_quality_value.configure(text=display_text)
+            # Optionally include the numeric value if available
+            aqi_text = f"{translated_aqi}" if aqi_value is not None else translated_aqi
+            self.air_quality_value.configure(text=aqi_text)
         else:
             self.air_quality_value.configure(text=na_text)
 
         # Note: Current weather icon display was removed previously.
 
-    def update_forecast(self, forecast_result: Dict[str, Any]):
+    def update_forecast(self, forecast_result: Dict[str, Any]): # Restored method
         """
         Update the forecast display section (3 days).
 
@@ -495,63 +500,59 @@ class AppWindow(ctk.CTk):
             forecast_result: The dictionary returned by `AccuWeatherClient.get_forecast()`,
                              containing 'data', 'connection_status', and 'api_status'.
         """
-        # Update status indicators first
+        # Update status indicators based on forecast fetch status
         connection_status = forecast_result.get('connection_status', False)
         api_status = forecast_result.get('api_status', 'error')
-        self.update_status_indicators(connection_status, api_status)
+        # Don't necessarily overwrite status if current weather already set it
+        # self.update_status_indicators(connection_status, api_status)
 
-        # Extract the list of daily forecast data
-        forecast_days: List[Dict[str, Any]] = forecast_result.get('data', [])
+        forecast_data = forecast_result.get('data', [])
         na_text = get_translation('not_available', config.LANGUAGE)
-        icon_missing_text = get_translation('icon_missing', config.LANGUAGE)
 
-        # Update forecast frames (up to the number of frames created)
-        num_frames = len(self.forecast_frames)
-        for i in range(num_frames):
-            if i < len(forecast_days):
-                day_data = forecast_days[i]
-                frame_info = self.forecast_frames[i]
-                frame_widget = frame_info['frame']
-                frame_widget.grid() # Ensure frame is visible
-
-                # Update day name
-                date_iso = day_data.get('date')
-                day_name_str = get_day_name(date_iso.split('T')[0]) if date_iso else na_text
-                frame_info['day'].configure(text=day_name_str)
-
-                # Update icon
-                icon_code = day_data.get('icon_code')
-                if icon_code is not None:
-                    icon_image = self.icon_handler.load_icon(icon_code, size=config.FORECAST_ICON_SIZE)
-                    if icon_image:
-                        frame_info['icon'].configure(image=icon_image, text="")
-                        frame_info['icon'].image = icon_image # Keep reference
-                    else:
-                        frame_info['icon'].configure(image=None, text=icon_missing_text)
-                else:
-                    frame_info['icon'].configure(image=None, text=icon_missing_text)
-
-                # Update condition text
-                condition = day_data.get('condition')
-                translated_condition = translate_weather_condition(condition, config.LANGUAGE) if condition else na_text
-                frame_info['condition'].configure(text=translated_condition)
-
-                # Update temperature (Max / Min)
+        for i, day_frame in enumerate(self.forecast_frames):
+            if i < len(forecast_data):
+                day_data = forecast_data[i]
+                date_str = day_data.get('date')
                 max_temp = day_data.get('max_temp')
                 min_temp = day_data.get('min_temp')
-                if max_temp is not None and min_temp is not None:
-                    temp_text = f"{int(round(max_temp))}°C / {int(round(min_temp))}°C"
-                    frame_info['temp'].configure(text=temp_text)
+                condition = day_data.get('condition')
+                icon_code = day_data.get('icon_code')
+
+                # Update Day Name (Call helper function which handles language internally)
+                day_name = get_day_name(date_str) if date_str else na_text
+                day_frame['day'].configure(text=day_name)
+
+                # Update Icon (Use load_icon to get CTkImage)
+                icon_image = self.icon_handler.load_icon(icon_code, config.FORECAST_ICON_SIZE)
+                if icon_image:
+                    day_frame['icon'].configure(image=icon_image, text="") # Set the image object
                 else:
-                    frame_info['temp'].configure(text=na_text)
+                    day_frame['icon'].configure(image=None, text=na_text) # Show N/A if icon fails
+
+                # Update Condition Text
+                translated_condition = translate_weather_condition(condition, config.LANGUAGE) if condition else na_text
+                day_frame['condition'].configure(text=translated_condition)
+
+                # Update Temperature Range
+                temp_text = na_text
+                if max_temp is not None and min_temp is not None:
+                    temp_text = f"{int(round(max_temp))}° / {int(round(min_temp))}°"
+                elif max_temp is not None:
+                    temp_text = f"{int(round(max_temp))}° / --°"
+                elif min_temp is not None:
+                    temp_text = f"--° / {int(round(min_temp))}°"
+                day_frame['temp'].configure(text=temp_text)
 
             else:
-                # Hide unused forecast frames if API returns fewer days than expected
-                self.forecast_frames[i]['frame'].grid_remove()
+                # Clear frames if not enough forecast data
+                day_frame['day'].configure(text=na_text)
+                day_frame['icon'].configure(image=None, text="")
+                day_frame['condition'].configure(text="")
+                day_frame['temp'].configure(text="")
 
     def update_status_indicators(self, connection_status: bool, api_status: str):
         """
-        Show or hide the connection and API limit status indicators.
+        Show or hide the connection and API error status indicators.
 
         Args:
             connection_status: True if internet is connected, False otherwise.
@@ -559,29 +560,29 @@ class AppWindow(ctk.CTk):
         """
         # --- Handle Connection Status ---
         if not connection_status:
-            # Show only connection error, hide others
+            # Show only connection error, hide API indicators
             self.connection_indicator.grid()
             self.connection_indicator.lift()
-            self.api_limit_indicator.grid_remove()
+            self.api_limit_indicator.grid_remove() # Restored remove
             self.api_error_indicator.grid_remove()
             return # No need to check API status if offline
 
         # --- Handle API Status (if connected) ---
         self.connection_indicator.grid_remove() # Hide connection error if connected
 
-        # API Limit Indicator
+        # API Limit Indicator - Restored logic
         if api_status == 'limit_reached':
             self.api_limit_indicator.grid()
             self.api_limit_indicator.lift()
-            self.api_error_indicator.grid_remove() # Hide error indicator
+            self.api_error_indicator.grid_remove()
         # API Error Indicator
         elif api_status == 'error':
             self.api_error_indicator.grid()
             self.api_error_indicator.lift()
-            self.api_limit_indicator.grid_remove() # Hide limit indicator
+            self.api_limit_indicator.grid_remove() # Restored remove
         # OK or Mock status - hide both API indicators
-        else:
-            self.api_limit_indicator.grid_remove()
+        else: # Covers 'ok' and 'mock'
+            self.api_limit_indicator.grid_remove() # Restored remove
             self.api_error_indicator.grid_remove()
 
     def exit_fullscreen(self, event=None):

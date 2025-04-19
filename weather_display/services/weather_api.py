@@ -338,8 +338,8 @@ class AccuWeatherClient:
         has_connection = self.connection_status
         api_status = 'ok' # Default assumption
 
-        # Check cache validity (uses WEATHER_UPDATE_INTERVAL_MINUTES from config)
-        cache_duration = config.WEATHER_UPDATE_INTERVAL_MINUTES * 60
+        # Check cache validity (uses ACCUWEATHER_UPDATE_INTERVAL_MINUTES from config)
+        cache_duration = config.ACCUWEATHER_UPDATE_INTERVAL_MINUTES * 60
         if (not force_refresh and
                 self.cache['current'] and
                 self.cache['last_weather_update'] and
@@ -502,8 +502,8 @@ class AccuWeatherClient:
         has_connection = self.connection_status
         api_status = 'ok'
 
-        # Check cache validity (uses same timestamp as current weather)
-        cache_duration = config.WEATHER_UPDATE_INTERVAL_MINUTES * 60
+        # Check cache validity (uses ACCUWEATHER_UPDATE_INTERVAL_MINUTES from config)
+        cache_duration = config.ACCUWEATHER_UPDATE_INTERVAL_MINUTES * 60
         if (not force_refresh and
                 self.cache['forecast'] and
                 self.cache['last_weather_update'] and

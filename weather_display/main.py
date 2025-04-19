@@ -23,7 +23,9 @@ try:
     from weather_display import config
     from weather_display.gui.app_window import AppWindow
     from weather_display.services.time_service import TimeService
-    from weather_display.services.weather_api import AccuWeatherClient
+    # Import both IMS and AccuWeather services
+    from weather_display.services.ims_lasthour import IMSLastHourWeather
+    from weather_display.services.weather_api import AccuWeatherClient # Added AccuWeather
     from weather_display.utils.helpers import check_internet_connection
 except ImportError as e:
     # Handle cases where the package structure might not be recognized immediately
@@ -37,7 +39,9 @@ except ImportError as e:
         from weather_display import config
         from weather_display.gui.app_window import AppWindow
         from weather_display.services.time_service import TimeService
-        from weather_display.services.weather_api import AccuWeatherClient
+        # Import both IMS and AccuWeather services
+        from weather_display.services.ims_lasthour import IMSLastHourWeather
+        from weather_display.services.weather_api import AccuWeatherClient # Added AccuWeather
         from weather_display.utils.helpers import check_internet_connection
     except ImportError:
         print("Failed to import necessary modules even after path adjustment.")
@@ -63,25 +67,23 @@ class WeatherDisplayApp:
     Main application class orchestrating services, GUI, and update loops.
 
     Attributes:
-        api_key (Optional[str]): AccuWeather API key used by the client.
         headless (bool): Flag indicating if running without a GUI.
         running (bool): Flag to control the main loops of background threads.
         time_service (TimeService): Instance for getting time and date.
-        weather_client (AccuWeatherClient): Instance for fetching weather data.
+        ims_weather (IMSLastHourWeather): Instance for fetching IMS weather data.
+        accuweather_client (Optional[AccuWeatherClient]): Instance for fetching AccuWeather data. # Added
         app_window (Optional[AppWindow]): Instance of the GUI window (None if headless).
         last_connection_status (bool): Tracks the last known internet connection state.
         _update_threads (List[threading.Thread]): List holding background update threads.
     """
 
-    def __init__(self, api_key: Optional[str] = None, headless: bool = False):
+    def __init__(self, headless: bool = False, api_key: Optional[str] = None): # Added api_key parameter
         """
         Initialize the Weather Display application services and optionally the GUI.
 
         Args:
-            api_key: AccuWeather API key. If None, the client will try config/env.
             headless: If True, initializes without creating a GUI window.
         """
-        self.api_key: Optional[str] = api_key
         self.headless: bool = headless
         self.running: bool = False # Controls thread loops
         self._update_threads: List[threading.Thread] = []
@@ -89,7 +91,27 @@ class WeatherDisplayApp:
 
         # Initialize services
         self.time_service = TimeService()
-        self.weather_client = AccuWeatherClient(api_key=self.api_key) # Pass key explicitly
+        # Initialize IMS weather service with station name from config
+        self.ims_weather = IMSLastHourWeather(station_name=config.IMS_STATION_NAME)
+        # Initialize AccuWeather client (API key/location handled internally)
+        self.accuweather_client: Optional[AccuWeatherClient] = None
+        try:
+            # Check if necessary AccuWeather config exists before initializing
+            if hasattr(config, 'ACCUWEATHER_BASE_URL'):
+                 # Pass the provided api_key (from args or None) to the client constructor
+                 # The client will handle falling back to config/env if api_key is None
+                 self.accuweather_client = AccuWeatherClient(api_key=api_key)
+                 logger.info("AccuWeather client initialized.")
+                 # Log warning if no key was provided via args AND none found by client
+                 if not api_key and not self.accuweather_client.api_key:
+                     logger.warning("AccuWeather API key not found in args, config, or environment. Client will use mock data.")
+                 elif api_key:
+                     logger.info("Using AccuWeather API key from command line argument.")
+            else:
+                 logger.warning("AccuWeather base URL not found in config. AccuWeather client NOT initialized.")
+        except Exception as e:
+            logger.error(f"Failed to initialize AccuWeatherClient: {e}", exc_info=True)
+            # Continue without AccuWeather if initialization fails
 
         # Initialize GUI only if not in headless mode
         self.app_window: Optional[AppWindow] = None
@@ -108,7 +130,8 @@ class WeatherDisplayApp:
             logger.info("Running in headless mode (no GUI).")
 
         # Track connection status for triggering immediate updates on reconnect
-        self.last_connection_status: bool = self.weather_client.connection_status
+        # Initial check - fetch_data will update this later
+        self.last_connection_status: bool = check_internet_connection()
 
         logger.info("Weather Display application initialized.")
 
@@ -127,7 +150,9 @@ class WeatherDisplayApp:
             logger.info("Starting GUI main loop...")
             # Perform initial updates before starting loop
             self._update_time_and_date()
-            self._update_weather()
+            self._update_weather() # Initial IMS update
+            if self.accuweather_client:
+                self._update_accuweather_data() # Initial AccuWeather update
             # Start the time update loop using Tkinter's 'after'
             self._update_time_and_date()
             self.app_window.mainloop() # Blocks until window is closed
@@ -202,12 +227,21 @@ class WeatherDisplayApp:
     def _start_update_threads(self):
         """Create and start background threads for weather and connection updates."""
         # Note: Time update is now handled by Tkinter's 'after' loop, not a separate thread.
-        logger.info("Starting background update threads (Weather, Connection)...")
+        logger.info("Starting background update threads (IMS Weather, AccuWeather, Connection)...")
         self._update_threads = [
-            # Removed TimeUpdateThread
-            threading.Thread(target=self._weather_update_loop, name="WeatherUpdateThread", daemon=True),
+            # IMS Weather Update Thread
+            threading.Thread(target=self._weather_update_loop, name="IMSWeatherUpdateThread", daemon=True),
+            # Connection Monitoring Thread
             threading.Thread(target=self._connection_monitoring_loop, name="ConnectionMonitorThread", daemon=True)
         ]
+        # Add AccuWeather thread only if client was initialized
+        if self.accuweather_client:
+            self._update_threads.append(
+                threading.Thread(target=self._accuweather_update_loop, name="AccuWeatherUpdateThread", daemon=True)
+            )
+        else:
+            logger.warning("AccuWeather client not initialized, skipping AccuWeather update thread.")
+
         for thread in self._update_threads:
             thread.start()
         logger.info("Background update threads started.")
@@ -215,34 +249,62 @@ class WeatherDisplayApp:
     # Removed _time_update_loop method
 
     def _weather_update_loop(self):
-        """Background loop to update weather data periodically."""
-        logger.debug("Weather update loop started.")
+        """Background loop to update IMS weather data periodically."""
+        logger.debug("IMS weather update loop started.")
         # Initial update is handled by the start() method before the loop begins.
         # This loop handles subsequent updates after the interval.
         while self.running:
             # Sleep *before* the next update to respect the interval
-            interval_seconds = config.WEATHER_UPDATE_INTERVAL_MINUTES * 60
+            # Use the specific IMS interval from config
+            interval_seconds = config.IMS_UPDATE_INTERVAL_MINUTES * 60
             # Allow loop to exit quickly if self.running becomes False during sleep
             for _ in range(int(interval_seconds)):
                  if not self.running: break
                  time.sleep(1)
             if not self.running: break # Exit if stopped during sleep
-            self._update_weather()
-        logger.debug("Weather update loop finished.")
+            self._update_weather() # Calls the IMS update function
+        logger.debug("IMS weather update loop finished.")
+
+    def _accuweather_update_loop(self):
+        """Background loop to update AccuWeather data periodically."""
+        if not self.accuweather_client:
+            logger.error("AccuWeather update loop started but client is not initialized. Loop will exit.")
+            return
+
+        logger.debug("AccuWeather update loop started.")
+        # Initial update handled by start()
+        while self.running:
+            # Sleep *before* the next update
+            interval_seconds = config.ACCUWEATHER_UPDATE_INTERVAL_MINUTES * 60
+            logger.debug(f"AccuWeather loop: Sleeping for {interval_seconds} seconds.")
+            for _ in range(int(interval_seconds)):
+                 if not self.running: break
+                 time.sleep(1)
+            if not self.running: break # Exit if stopped during sleep
+
+            self._update_accuweather_data() # Call the AccuWeather update function
+
+        logger.debug("AccuWeather update loop finished.")
+
 
     def _connection_monitoring_loop(self):
         """Background loop to monitor internet connection status."""
         logger.debug("Connection monitoring loop started.")
         check_interval_seconds = 30 # Check connection every 30 seconds
         while self.running:
-            current_status = self.weather_client.connection_status
+            # Use the helper function directly for connection checks
+            current_status = check_internet_connection()
 
-            # If connection restored, trigger immediate weather update
+            # If connection restored, trigger immediate updates for both services
             if not self.last_connection_status and current_status:
-                logger.info("Internet connection restored. Triggering immediate weather update.")
-                # Run weather update in a separate thread to avoid blocking this loop
-                update_thread = threading.Thread(target=self._update_weather, daemon=True)
-                update_thread.start()
+                logger.info("Internet connection restored. Triggering immediate weather updates (IMS & AccuWeather).")
+                # Run IMS update in a separate thread
+                ims_update_thread = threading.Thread(target=self._update_weather, name="IMSImmediateUpdate", daemon=True)
+                ims_update_thread.start()
+                # Run AccuWeather update in a separate thread (if client exists)
+                if self.accuweather_client:
+                    accu_update_thread = threading.Thread(target=self._update_accuweather_data, name="AccuWeatherImmediateUpdate", daemon=True)
+                    accu_update_thread.start()
 
             # Log status change only if it actually changed
             if self.last_connection_status != current_status:
@@ -294,39 +356,71 @@ class WeatherDisplayApp:
 
 
     def _update_weather(self):
-        """Fetch weather/forecast data and update GUI or log if headless."""
-        logger.info("Attempting to update weather data...")
+        """Fetch IMS weather data and update GUI or log if headless."""
+        logger.info("Attempting to update weather data from IMS...")
+        connection_status = False
+        api_status = 'error' # Default to error
+        current_weather_data = {} # Initialize empty data dict
+
         try:
-            # Fetch both current weather and forecast
-            # The API client handles caching internally
-            current_weather_result = self.weather_client.get_current_weather()
-            forecast_result = self.weather_client.get_forecast(days=3) # Request 3 days for display
+            # Fetch data from IMS service
+            # Use mock data setting if enabled (though IMS service doesn't have built-in mock)
+            # For now, we always fetch live data unless USE_MOCK_DATA is True and handled elsewhere
+            if config.USE_MOCK_DATA:
+                 logger.warning("Mock data requested, but IMS service doesn't have built-in mock. Skipping fetch.")
+                 # You might want to define mock IMS data here if needed
+                 current_weather_data = {'temperature': 25, 'humidity': 60} # Example mock
+                 connection_status = True
+                 api_status = 'mock'
+            else:
+                success = self.ims_weather.fetch_data()
+                connection_status = success # Fetch success implies connection
+                if success:
+                    api_status = 'ok'
+                    measurements = self.ims_weather.get_all_measurements()
+                    if measurements:
+                        # Extract Temperature (TD) and Humidity (RH)
+                        temp_data = measurements.get('TD')
+                        humidity_data = measurements.get('RH')
+
+                        current_weather_data['temperature'] = float(temp_data['value']) if temp_data else None
+                        current_weather_data['humidity'] = int(humidity_data['value']) if humidity_data else None
+                        logger.info(f"IMS Data Fetched: Temp={current_weather_data['temperature']}, Humidity={current_weather_data['humidity']}")
+                    else:
+                        logger.warning("IMS data fetched successfully, but no measurements found.")
+                        api_status = 'error' # Treat as error if no measurements
+                else:
+                    logger.error("Failed to fetch data from IMS.")
+                    api_status = 'error'
+
+            # Prepare result structure for GUI update
+            update_payload = {
+                'data': current_weather_data,
+                'connection_status': connection_status,
+                'api_status': api_status # 'ok', 'error', 'mock'
+            }
 
             # Update GUI if it exists
             if self.app_window:
                 # Schedule GUI updates on the main Tkinter thread
-                # Pass copies of the data to the lambda to capture current state
-                self.app_window.after(0, lambda cw=current_weather_result.copy(): self.app_window.update_current_weather(cw))
-                self.app_window.after(0, lambda fc=forecast_result.copy(): self.app_window.update_forecast(fc))
+                self.app_window.after(0, lambda payload=update_payload.copy(): self.app_window.update_current_weather(payload))
+                # No forecast update needed
             elif self.headless:
                  # Log fetched data details in headless mode
-                 logger.info(f"Headless Weather Update:")
-                 logger.info(f"  Current: {current_weather_result.get('data', {})}")
-                 logger.info(f"  Forecast: {forecast_result.get('data', [])}")
-                 logger.info(f"  API Status (Current): {current_weather_result.get('api_status', 'unknown')}")
-                 logger.info(f"  API Status (Forecast): {forecast_result.get('api_status', 'unknown')}")
+                 logger.info(f"Headless Weather Update (IMS):")
+                 logger.info(f"  Data: {current_weather_data}")
+                 logger.info(f"  Connection Status: {connection_status}")
+                 logger.info(f"  API Status: {api_status}")
 
-            # Update internal connection status tracker based on current weather fetch
-            # This helps the connection monitor log changes accurately in headless mode
-            conn_status = current_weather_result.get('connection_status', False)
-            if self.last_connection_status != conn_status:
-                 logger.debug(f"Connection status updated to: {'Connected' if conn_status else 'Disconnected'}")
-                 self.last_connection_status = conn_status
+            # Update internal connection status tracker
+            if self.last_connection_status != connection_status:
+                 logger.debug(f"Connection status updated to: {'Connected' if connection_status else 'Disconnected'}")
+                 self.last_connection_status = connection_status
 
-            logger.info("Weather data update cycle finished.")
+            logger.info("IMS weather data update cycle finished.")
 
         except Exception as e:
-            logger.error(f"Unexpected error during weather update cycle: {e}", exc_info=True)
+            logger.error(f"Unexpected error during IMS weather update cycle: {e}", exc_info=True)
             # Attempt to update status indicators in GUI to show error state
             if self.app_window:
                 # Assume connection failed or other error occurred
@@ -336,16 +430,70 @@ class WeatherDisplayApp:
                  logger.warning("Connection status changed: Disconnected (due to update error)")
                  self.last_connection_status = False
 
+    def _update_accuweather_data(self):
+        """Fetch AccuWeather data (current & forecast) and log."""
+        if not self.accuweather_client:
+            logger.debug("Skipping AccuWeather update: client not initialized.")
+            return
+
+        logger.info("Attempting to update AccuWeather data (current & forecast)...")
+        try:
+            # Fetch current weather (includes AQI if available)
+            # Force refresh to ensure it respects the loop interval, not just cache
+            current_result = self.accuweather_client.get_current_weather(force_refresh=True)
+            current_data = current_result.get('data', {})
+            current_api_status = current_result.get('api_status', 'error')
+            current_conn_status = current_result.get('connection_status', False) # Should be true if fetch attempted
+
+            # Fetch forecast
+            # Force refresh for the same reason
+            forecast_result = self.accuweather_client.get_forecast(force_refresh=True)
+            forecast_data = forecast_result.get('data', [])
+            forecast_api_status = forecast_result.get('api_status', 'error')
+            # forecast_conn_status = forecast_result.get('connection_status', False) # Less critical
+
+            # Log results (especially for headless mode)
+            logger.info(f"AccuWeather Update Cycle Finished:")
+            logger.info(f"  Current Weather Status: {current_api_status} (Connection: {current_conn_status})")
+            logger.debug(f"  Current Data: {current_data}") # Debug level for potentially large data
+            logger.info(f"  Forecast Status: {forecast_api_status}")
+            logger.debug(f"  Forecast Data Count: {len(forecast_data)}") # Debug level
+
+            # --- Schedule GUI Updates ---
+            if self.app_window:
+                 # Update current weather section (which now includes AQI)
+                 # Note: IMS update_current_weather only updates temp/humidity.
+                 # This call will update AQI based on AccuWeather data.
+                 # We pass the *current_result* which contains the necessary structure.
+                 self.app_window.after(0, lambda res=current_result.copy(): self.app_window.update_current_weather(res))
+
+                 # Update the forecast section
+                 self.app_window.after(0, lambda res=forecast_result.copy(): self.app_window.update_forecast(res))
+                 logger.debug("Scheduled AccuWeather GUI updates (Current Weather AQI & Forecast).")
+
+        except Exception as e:
+            logger.error(f"Unexpected error during AccuWeather update cycle: {e}", exc_info=True)
+            # Optionally update GUI status indicators if an error occurs during the fetch
+            if self.app_window:
+                 # Determine overall status - prioritize error/limit from either fetch
+                 final_api_status = 'ok'
+                 if current_api_status in ['error', 'limit_reached'] or forecast_api_status in ['error', 'limit_reached']:
+                     final_api_status = 'error' if 'error' in [current_api_status, forecast_api_status] else 'limit_reached'
+
+                 # Use the determined status to update indicators
+                 self.app_window.after(0, lambda status=final_api_status: self.app_window.update_status_indicators(True, status))
+
 
 # --- Command Line Argument Parsing ---
 
 def parse_arguments() -> argparse.Namespace:
     """Parse command line arguments for the application."""
     parser = argparse.ArgumentParser(description='Weather Display Application')
+    # Restore API key argument for AccuWeather
     parser.add_argument(
         '--api-key',
         help='AccuWeather API key (overrides environment variable/config)'
-    )
+    ) # Correctly closed parenthesis
     parser.add_argument(
         '--mock',
         action='store_true',
@@ -394,9 +542,7 @@ def main():
 
     # --- Configuration Override ---
     # Apply command-line arguments to override config settings
-    if args.api_key:
-        logger.info("Overriding API key from command line argument.")
-        config.ACCUWEATHER_API_KEY = args.api_key
+    # Note: API key is passed directly to the constructor, not overriding config globally here
     if args.mock:
         logger.info("Enabling mock data mode via command line argument.")
         config.USE_MOCK_DATA = True
@@ -405,14 +551,8 @@ def main():
         config.FULLSCREEN = False
 
     # --- Pre-run Checks ---
-    # Check for API key if not using mock data
-    if not config.USE_MOCK_DATA and not config.ACCUWEATHER_API_KEY:
-        logger.critical(
-            "AccuWeather API key is missing and mock data is disabled. "
-            "Set ACCUWEATHER_API_KEY environment variable or use --api-key. "
-            "Alternatively, run with --mock."
-        )
-        sys.exit(1)
+    # API key check is handled implicitly by AccuWeatherClient initialization below
+    # (it logs errors/warnings if no key is found and mock data is not enabled)
 
     # Wait for internet connection if not using mock data
     if not config.USE_MOCK_DATA:
@@ -426,10 +566,17 @@ def main():
         logger.info(f"Using location: '{config.LOCATION}'")
         logger.info(f"Headless mode: {args.headless}")
         logger.info(f"Mock data mode: {config.USE_MOCK_DATA}")
+        logger.info(f"Using IMS Station: '{config.IMS_STATION_NAME}'")
+        if app and app.accuweather_client: # Check if client was initialized
+             logger.info(f"Using AccuWeather Location: '{app.accuweather_client.location_query}'")
+             logger.info(f"AccuWeather Language: '{app.accuweather_client.language}'")
+        else:
+             logger.warning("AccuWeather client not available.")
+
 
         app = WeatherDisplayApp(
-            api_key=config.ACCUWEATHER_API_KEY, # Pass configured key
-            headless=args.headless
+            headless=args.headless,
+            api_key=args.api_key # Pass API key from args
         )
         app.start() # Starts GUI mainloop or headless wait loop
 

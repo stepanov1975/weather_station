@@ -467,7 +467,9 @@ def get_day_name_localized(date_str: str, language: str = 'en') -> str:
         localized "Unknown" string if parsing fails or the day is invalid.
     """
     try:
-        date_obj = datetime.strptime(date_str, '%Y-%m-%d')
+        # Handle full ISO 8601 timestamp by extracting only the date part
+        date_part = date_str.split('T')[0]
+        date_obj = datetime.strptime(date_part, '%Y-%m-%d')
         weekday = date_obj.weekday()  # 0 = Monday, 6 = Sunday
 
         day_names_dict = DAY_NAMES.get(language, DAY_NAMES['en'])
