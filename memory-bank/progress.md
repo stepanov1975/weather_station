@@ -38,7 +38,7 @@
 
 - **End-to-End Testing:** Verify the application runs correctly after recent changes. Confirm display updates, status indicators, caching behavior, and fullscreen mode. Test different configuration options.
 - **Error Handling Robustness:** Further testing of network issues, API errors (beyond limits), and edge cases, especially with the new caching and status logic. Test behavior when cache files are missing or corrupted.
-- **Configuration Review:** Ensure location configuration is optimal. Review new UI configuration options (especially status colors).
+- **Configuration Review:** Ensure location configuration is optimal. Review new UI configuration options.
 - **Code Testing:** Review and potentially implement unit/integration tests for services, GUI updates, utility functions, and caching logic.
 - **Refinement:** Ongoing review against PEP 8 and custom instructions. Consider localization for status indicator text.
 
@@ -54,7 +54,6 @@
 ## 4. Known Issues
 
 - Status indicator text ("Network: OK", "API: Limit", etc.) is not yet localized.
-- Status indicator colors rely on keys (`status_ok_text`, etc.) that might not be defined in `config.py` yet.
 
 ## 5. Evolution of Project Decisions
 
@@ -74,3 +73,5 @@
     - Fixed multiple indentation errors in `gui/app_window.py`.
 - **April 19, 2025 (Update 6 - Fullscreen Refinement):**
     - Replaced delayed fullscreen (`self.after()`) with `<Map>` event binding in `gui/app_window.py` for improved reliability on Raspberry Pi 4.
+- **April 19, 2025 (Update 7 - Status Colors):**
+    - Added `status_ok_text`, `status_warning_text`, `status_error_text` keys to `COLOR_THEME` in `config.py` to enable visual feedback in the status bar.

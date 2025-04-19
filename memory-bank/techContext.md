@@ -58,3 +58,4 @@
     - Corrected `TypeError` in `gui/app_window.py` caused by incorrect parameters passed to `update_status_indicators`.
     - Fixed indentation errors in `gui/app_window.py` related to fullscreen logic.
     - **Fullscreen Improvement (April 19, 2025 - Update 6):** Replaced delayed fullscreen application (`self.after()`) with event binding (`<Map>`) in `gui/app_window.py` for potentially better reliability on platforms like Raspberry Pi 4.
+    - **Configuration Update (April 19, 2025 - Update 7):** Added `status_ok_text`, `status_warning_text`, `status_error_text` keys to `COLOR_THEME` in `config.py`.

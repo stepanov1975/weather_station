@@ -30,9 +30,9 @@
 - Update `memory-bank/progress.md`.
 - Update `memory-bank/systemPatterns.md`.
 - Update `memory-bank/techContext.md`.
+- **Done:** Added color configuration keys (`status_ok_text`, `status_warning_text`, `status_error_text`) to `config.py` to enable visual feedback in the status bar.
 - Confirm all memory bank files accurately reflect the recent changes.
 - Consider adding localization for the new status indicator text ("Network: OK", "API: Limit", etc.).
-- Consider adding color configuration keys (`status_ok_text`, `status_warning_text`, `status_error_text`) to `config.py` to enable visual feedback in the status bar.
 
 ## 4. Active Decisions & Considerations
 
