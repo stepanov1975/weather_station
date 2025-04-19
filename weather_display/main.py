@@ -29,6 +29,7 @@ import os
 import sys
 import time
 import logging
+import logging.handlers # Added for rotating file handler
 import threading
 import argparse
 import signal
@@ -65,20 +66,38 @@ except ImportError as e:
 
 
 # --- Global Logger Setup ---
-# Configure basic logging. Logs to both console (StreamHandler) and a file
-# ('weather_display.log'). The format includes timestamp, logger name, level,
-# and the message. More advanced configuration could involve rotating file
-# handlers or different formats per handler.
-logging.basicConfig(
-    level=logging.INFO, # Set the minimum logging level (e.g., DEBUG, INFO, WARNING)
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.StreamHandler(), # Output logs to the console
-        logging.FileHandler('weather_display.log') # Output logs to a file
-    ]
+# Configure logging with console output and daily rotating file output.
+log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+log_level = logging.INFO # Set the minimum logging level
+
+# Get the root logger
+root_logger = logging.getLogger()
+root_logger.setLevel(log_level)
+root_logger.handlers.clear() # Clear any default handlers (important if run multiple times)
+
+# Console Handler
+stream_handler = logging.StreamHandler()
+stream_handler.setFormatter(log_formatter)
+stream_handler.setLevel(log_level) # Set level for this handler
+root_logger.addHandler(stream_handler)
+
+# Rotating File Handler (rotates daily at midnight, keeps 7 backups)
+file_handler = logging.handlers.TimedRotatingFileHandler(
+    filename='weather_display.log',
+    when='midnight',        # Rotate at midnight
+    interval=1,             # Rotate daily
+    backupCount=7,          # Keep 7 old log files
+    encoding='utf-8',       # Use UTF-8 encoding
+    delay=False             # Create log file immediately
 )
+file_handler.setFormatter(log_formatter)
+file_handler.setLevel(log_level) # Set level for this handler
+root_logger.addHandler(file_handler)
+
 # Get a logger instance specific to this module (__name__ resolves to 'weather_display.main')
+# This logger will inherit the handlers and level from the root logger.
 logger = logging.getLogger(__name__)
+logger.info("Logging configured with console and daily rotating file handler.")
 
 
 class WeatherDisplayApp:

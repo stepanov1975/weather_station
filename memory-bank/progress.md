@@ -50,6 +50,7 @@
 - **Fullscreen Behavior Improved:** Replaced delayed fullscreen application with `<Map>` event binding in `gui/app_window.py` for better reliability.
 - **Key Bugs Fixed:** Addressed `TypeError` in `update_status_indicators` call, indentation errors in fullscreen logic. Previous fixes for date parsing, icon loading, `NameError`, and `get_day_name` arguments remain.
 - **Documentation Updated:** Memory Bank files are being updated to reflect the latest changes.
+- **Logging:** Configured daily rotating file logging (`weather_display.log`) in `main.py`.
 
 ## 4. Known Issues
 
@@ -75,3 +76,5 @@
     - Replaced delayed fullscreen (`self.after()`) with `<Map>` event binding in `gui/app_window.py` for improved reliability on Raspberry Pi 4.
 - **April 19, 2025 (Update 7 - Status Colors):**
     - Added `status_ok_text`, `status_warning_text`, `status_error_text` keys to `COLOR_THEME` in `config.py` to enable visual feedback in the status bar.
+- **April 19, 2025 (Update 8 - Logging Rotation):**
+    - Replaced basic file logging with `TimedRotatingFileHandler` in `main.py` for daily log rotation at midnight.
