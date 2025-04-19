@@ -82,22 +82,33 @@ stream_handler.setLevel(log_level) # Set level for this handler
 root_logger.addHandler(stream_handler)
 
 # Rotating File Handler (rotates daily at midnight, keeps 7 backups)
-file_handler = logging.handlers.TimedRotatingFileHandler(
-    filename='weather_display.log',
-    when='midnight',        # Rotate at midnight
-    interval=1,             # Rotate daily
-    backupCount=7,          # Keep 7 old log files
-    encoding='utf-8',       # Use UTF-8 encoding
-    delay=False             # Create log file immediately
-)
-file_handler.setFormatter(log_formatter)
-file_handler.setLevel(log_level) # Set level for this handler
-root_logger.addHandler(file_handler)
+try:
+    file_handler = logging.handlers.TimedRotatingFileHandler(
+        filename='/home/alex/weather_claude/weather_display.log',
+        when='midnight',        # Rotate at midnight
+        interval=1,             # Rotate daily
+        backupCount=7,          # Keep 7 old log files
+        encoding='utf-8',       # Use UTF-8 encoding
+        delay=False             # Create log file immediately
+    )
+    file_handler.setFormatter(log_formatter)
+    file_handler.setLevel(log_level) # Set level for this handler
+    root_logger.addHandler(file_handler)
+    log_file_success = True
+except (IOError, PermissionError, OSError) as e:
+    # Log the error to the console handler if file handler setup fails
+    # Use the root logger directly here as the module-level 'logger' might not be fully set up
+    root_logger.error(f"CRITICAL: Failed to initialize file logging to 'weather_display.log'. Error: {e}", exc_info=False)
+    root_logger.error("Logging will proceed to console only.")
+    log_file_success = False
 
 # Get a logger instance specific to this module (__name__ resolves to 'weather_display.main')
 # This logger will inherit the handlers and level from the root logger.
 logger = logging.getLogger(__name__)
-logger.info("Logging configured with console and daily rotating file handler.")
+if log_file_success:
+    logger.info("Logging configured with console and daily rotating file handler.")
+else:
+    logger.warning("Logging configured with console handler ONLY due to file handler initialization error.")
 
 
 class WeatherDisplayApp:

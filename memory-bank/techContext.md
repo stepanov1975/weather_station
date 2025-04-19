@@ -59,4 +59,4 @@
     - Fixed indentation errors in `gui/app_window.py` related to fullscreen logic.
     - **Fullscreen Improvement (April 19, 2025 - Update 6):** Replaced delayed fullscreen application (`self.after()`) with event binding (`<Map>`) in `gui/app_window.py` for potentially better reliability on platforms like Raspberry Pi 4.
     - **Configuration Update (April 19, 2025 - Update 7):** Added `status_ok_text`, `status_warning_text`, `status_error_text` keys to `COLOR_THEME` in `config.py`.
-    - **Logging Update (April 19, 2025 - Update 8):** Replaced basic `FileHandler` with `logging.handlers.TimedRotatingFileHandler` in `main.py` to enable daily log rotation at midnight.
+    - **Logging Update (April 19, 2025 - Update 8):** Replaced basic `FileHandler` with `logging.handlers.TimedRotatingFileHandler` in `main.py` to enable daily log rotation at midnight. Added error handling around file handler initialization to log issues to console.

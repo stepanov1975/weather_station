@@ -24,7 +24,9 @@
     - **Fullscreen Fix (Current):** Changed `_configure_fullscreen` to bind the `_apply_fullscreen` logic to the window's `<Map>` event instead of using `self.after()`. This triggers fullscreen when the window is actually displayed, aiming for better reliability on platforms like Raspberry Pi 4. Added `_apply_fullscreen_event` handler which unbinds itself after the first trigger.
     - **Bug Fix:** Removed an erroneous call to `update_status_indicators` from within `update_current_weather` that was causing a `TypeError` and preventing weather data display.
     - **Bug Fix:** Corrected indentation errors within the `_apply_fullscreen` method's exception handling.
-- **Logging:** Updated logging configuration in `main.py` to use `TimedRotatingFileHandler` for daily log rotation at midnight, keeping 7 backups, while retaining console output.
+- **Logging:**
+    - Updated logging configuration in `main.py` to use `TimedRotatingFileHandler` for daily log rotation at midnight, keeping 7 backups, while retaining console output.
+    - Added `try...except` block around file handler initialization in `main.py` to catch and log potential errors (e.g., permissions) to the console, aiding diagnosis if file logging fails.
 
 ## 3. Next Steps
 
