@@ -23,8 +23,9 @@
 - Network connectivity required to fetch live weather data (unless using `--mock`).
 - Requires a valid AccuWeather API key (provided via environment variable or command-line) for forecast/AQI data. IMS feed is public.
 - GUI operation requires a graphical desktop environment (e.g., Raspberry Pi OS Desktop, not Lite). `DISPLAY` environment variable must be set.
-- Font availability (`Helvetica` configured by default) on the target system is necessary for correct UI rendering.
+- Font availability (defined in `config.FONTS`, defaulting to `Helvetica`) on the target system is necessary for correct UI rendering.
 - Potential API rate limits for AccuWeather free tier need to be considered (handled partially by caching and status indicators).
+- The extensive UI configuration options in `config.py` require careful management to ensure valid settings.
 
 ## 4. Dependencies
 
@@ -44,3 +45,6 @@
 - **Documentation:** Added comprehensive docstrings to all modules, classes, and functions within the `weather_display` package.
 - **Bug Fix (`NameError`):** Resolved an issue in `utils/helpers.py` by adding `from typing import List`.
 - **Bug Fix (`TypeError`):** Corrected the function call to `get_day_name` in `gui/app_window.py` to pass the correct number of arguments.
+- **GUI Refactoring:**
+    - Overhauled `gui/app_window.py` to use a modular, configuration-driven approach based on CustomTkinter.
+    - Significantly expanded `config.py` with detailed UI settings (layout, fonts, colors, padding, margins, optional elements).

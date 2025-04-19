@@ -150,7 +150,7 @@ DEFAULT_FONT_FAMILY = "Helvetica"
 # Format: (Family, Size, Weight) - Weight can be "normal" or "bold".
 # Use DEFAULT_FONT_FAMILY if family is None.
 FONTS = {
-    "time": (None, 200, "bold"), # Large time display (HH:MM)
+    "time": (None, 280, "bold"), # Large time display (HH:MM)
     "weekday": (None, 40, "normal"), # Day of the week (e.g., "Sunday")
     "day_number": (None, 140, "bold"), # Large day number (e.g., "21")
     "month_year": (None, 40, "normal"), # Month and year (e.g., "April 2024")

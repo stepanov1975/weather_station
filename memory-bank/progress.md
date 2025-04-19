@@ -15,7 +15,10 @@
 - **GUI Display:**
     - `gui/app_window.py` restored to display IMS Temp/Humidity, AccuWeather AQI, and 3-day AccuWeather forecast.
     - Data flow from `main.py`'s AccuWeather update loop to the GUI's `update_current_weather` (for AQI) and `update_forecast` methods is implemented.
-    - Status indicators for connection, API limit, and API errors are present and updated.
+    - Status indicators for connection, API limit, and API errors are present and updated (can be hidden via config).
+- **GUI Refactoring (Configuration-Driven):**
+    - `gui/app_window.py` refactored to use a modular, component-based structure.
+    - Layout (region heights), styling (fonts, colors, padding, margins, radii), and optional elements (status bar, humidity, AQI) are now controlled via `config.py`.
 - **Code Documentation:** All Python files within `weather_display` now have detailed docstrings.
 - **README:** Updated `README.md` reflects current features and includes Raspberry Pi 4 details.
 - **Bug Fixes:**
@@ -26,16 +29,17 @@
 
 ## 2. What's Left to Build / Verify
 
-- **End-to-End Testing:** Verify the application runs correctly after recent fixes and documentation additions. Confirm display updates as expected.
-- **Error Handling Robustness:** Further testing of network issues, API errors (beyond limits), and edge cases.
-- **Configuration Review:** Ensure location configuration (`config.LOCATION`, `config.IMS_STATION_NAME`) is optimal and potentially user-configurable.
+- **End-to-End Testing:** Verify the application runs correctly after the GUI refactoring. Confirm display updates as expected and test different configuration options (layout, fonts, colors, optional elements).
+- **Error Handling Robustness:** Further testing of network issues, API errors (beyond limits), and edge cases, especially with the refactored GUI.
+- **Configuration Review:** Ensure location configuration (`config.LOCATION`, `config.IMS_STATION_NAME`) is optimal. Review the new UI configuration options for clarity and completeness.
 - **Code Testing:** Review and potentially implement unit/integration tests for the services, GUI updates, and utility functions.
 - **Refinement:** Ongoing review against PEP 8 and custom instructions.
 
 ## 3. Current Status
 
+- **GUI Refactored:** The GUI (`gui/app_window.py`) is now modular and driven by extensive configuration options in `config.py`.
 - **Dual API Integration Complete:** Code modified to fetch and handle data from both IMS and AccuWeather at specified intervals.
-- **GUI Functionality Restored:** Forecast and AQI display elements and logic restored in the GUI.
+- **GUI Functionality Restored:** Forecast and AQI display elements and logic restored in the GUI. (Note: This is now part of the refactored GUI).
 - **Configuration Updated:** `config.py` updated with necessary API settings and intervals.
 - **Key Bugs Fixed:** Addressed `TypeError` in date parsing, `AttributeError` in icon handling, `NameError` in helpers, and `TypeError` in GUI forecast update based on runtime feedback.
 - **Documentation Complete:** Added detailed docstrings to all Python modules within `weather_display`.
@@ -61,3 +65,6 @@
     - Updated `README.md` to be more detailed, reflect current features (dual API), and specify Raspberry Pi 4 as the target platform.
     - Fixed `NameError: name 'List' is not defined` in `utils/helpers.py`.
     - Fixed `TypeError: get_day_name() takes 1 positional argument but 2 were given` in `gui/app_window.py`.
+- **April 19, 2025 (Update 3 - GUI Refactor):**
+    - Refactored `gui/app_window.py` for modularity and configuration-driven layout/styling.
+    - Updated `config.py` with detailed UI settings (layout weights, fonts, colors, padding, optional elements).

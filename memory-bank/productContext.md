@@ -17,24 +17,29 @@ Provides a dedicated, always-on display for essential time, date, and detailed w
     - Localized weather condition description.
     - High/Low temperature range (°C).
 - **Dual API Integration:** Fetches data from both AccuWeather and IMS services.
-- **GUI:** Clean, touch-optimized interface (using CustomTkinter) with configurable dark/light themes. Supports fullscreen and windowed modes.
-- **Configuration:** Allows setting AccuWeather location, IMS station name, language, update intervals, and UI appearance via `config.py`.
-- **Status Indicators:** Displays status for internet connection and AccuWeather API health (limit reached, errors).
+- **GUI:** Modular, configuration-driven interface using CustomTkinter. Features distinct regions for Time/Date, Current Conditions, and Forecast. Supports fullscreen and windowed modes.
+- **Configuration:** Highly configurable via `config.py`. Allows setting:
+    - API details (AccuWeather location, IMS station, keys).
+    - Language and update intervals.
+    - Detailed UI appearance: dark/light mode, specific colors, fonts for various elements, padding, margins, corner radii.
+    - Layout structure: Relative heights of UI regions.
+    - Optional elements: Show/hide status bar, humidity, AQI.
+- **Status Indicators:** Displays status for internet connection and AccuWeather API health (limit reached, errors) - can be hidden via config.
 - **Localization:** Supports English ('en') and Russian ('ru') for UI text, dates, and weather descriptions.
 
 ## 3. User Experience Goals
 
 - **At-a-Glance Information:** Present key time, date, and weather data clearly and concisely.
 - **Reliability:** Provide up-to-date information by combining frequent local updates (IMS) with broader forecasts (AccuWeather). Handle API errors and connection issues gracefully.
-- **Customization:** Allow users to configure location, language, and appearance to suit their needs.
+- **Deep Customization:** Allow users extensive control over location, language, data sources, UI layout (region sizes), appearance (fonts, colors, spacing), and optional elements via the configuration file.
 - **Platform Suitability:** Optimized for running on a Raspberry Pi 4 with a touchscreen, potentially in a kiosk setup.
-- **Low Friction:** Easy setup with clear instructions for API key handling and configuration.
+- **Low Friction:** Easy setup with clear instructions for API key handling and configuration, while offering advanced customization for those who want it.
 
 ## 4. Target User Journey
 
-1.  User sets up the application on a Raspberry Pi 4 (or similar Linux system), providing an AccuWeather API key and configuring location/IMS station in `config.py`.
+1.  User sets up the application on a Raspberry Pi 4 (or similar Linux system), providing an AccuWeather API key and configuring location/IMS station in `config.py`. Optionally, the user extensively customizes the UI layout, fonts, colors, and optional elements in `config.py`.
 2.  User runs the application (potentially configured to auto-start on boot).
-3.  Application launches (typically fullscreen) and displays the combined weather information for the configured locations/sources.
+3.  Application launches (typically fullscreen) displaying the weather information according to the user's configuration.
 4.  User glances at the display periodically to get time, date, current conditions, AQI, and forecast information.
 5.  Application runs continuously, updating data in the background and showing status indicators if issues arise.
 6.  (Optional) User exits fullscreen (Escape key) or stops the application if needed.
