@@ -11,6 +11,8 @@ for testing, and handling API request limits.
 import time
 import random
 import logging
+import json
+import os
 from datetime import datetime, timedelta
 from typing import Optional, Dict, Any, List, Tuple
 
@@ -22,6 +24,14 @@ from ..utils.localization import get_translation, translate_aqi_category
 
 
 logger = logging.getLogger(__name__)
+
+# Define the path for the persistent location cache file
+# Place it in the parent directory of the 'weather_display' package
+_MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(_MODULE_DIR)) # Go up two levels
+LOCATION_CACHE_FILE = os.path.join(_PROJECT_ROOT, "location_cache.json")
+logger.debug(f"Location cache file path: {LOCATION_CACHE_FILE}")
+
 
 # Define expected structure for cached data (for clarity/documentation)
 # Using comments as TypedDict might be overly complex here.
@@ -128,15 +138,38 @@ class AccuWeatherClient:
         current_time = time.time()
         cache_duration = self._LOCATION_KEY_CACHE_DURATION
 
-        # Check cache first
+        # 1. Try loading from persistent file cache first (unless forced)
+        if not force_refresh:
+            try:
+                if os.path.exists(LOCATION_CACHE_FILE):
+                    with open(LOCATION_CACHE_FILE, 'r') as f:
+                        file_cache = json.load(f)
+                    cached_key = file_cache.get('location_key')
+                    cached_time = file_cache.get('timestamp')
+
+                    if cached_key and cached_time and (current_time - cached_time) < cache_duration:
+                        logger.info(f"Using location key '{cached_key}' from file cache.")
+                        # Update in-memory cache as well
+                        self.cache['location_key'] = cached_key
+                        self.cache['last_location_check'] = cached_time
+                        return cached_key
+                    else:
+                        logger.debug("Location key file cache expired or invalid.")
+                else:
+                    logger.debug("Location key file cache does not exist.")
+            except (IOError, json.JSONDecodeError, TypeError) as e:
+                logger.warning(f"Error reading location cache file '{LOCATION_CACHE_FILE}': {e}")
+                # Proceed to check in-memory or fetch
+
+        # 2. Check in-memory cache (if file cache failed or was skipped)
         if (not force_refresh and
                 self.cache['location_key'] and
                 self.cache['last_location_check'] and
                 (current_time - self.cache['last_location_check']) < cache_duration):
-            logger.debug("Returning cached location key.")
+            logger.debug("Returning in-memory cached location key.")
             return self.cache['location_key']
 
-        # Handle mock data or no connection
+        # 3. Handle mock data or no connection (if no valid cache found yet)
         if self.use_mock_data or not self.connection_status:
             logger.info("Using mock location key (mock data mode or no connection).")
             self.cache['location_key'] = "mock_location_key_12345" # Static mock key
@@ -186,6 +219,16 @@ class AccuWeatherClient:
                     logger.info(f"Selected location key: {location_key} for {location_name}, {country}")
                     self.cache['location_key'] = location_key
                     self.cache['last_location_check'] = current_time
+
+                    # Save to persistent file cache
+                    try:
+                        cache_data = {'location_key': location_key, 'timestamp': current_time}
+                        with open(LOCATION_CACHE_FILE, 'w') as f:
+                            json.dump(cache_data, f)
+                        logger.info(f"Saved location key to file cache: {LOCATION_CACHE_FILE}")
+                    except IOError as e:
+                        logger.error(f"Error writing location cache file '{LOCATION_CACHE_FILE}': {e}")
+
                     return location_key
                 else:
                     logger.error(f"First location result for '{self.location_query}' missing 'Key'. Response: {selected_location}")
