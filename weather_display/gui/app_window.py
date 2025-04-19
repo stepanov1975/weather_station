@@ -154,11 +154,18 @@ class AppWindow(ctk.CTk):
     def _configure_fullscreen(self):
         """Configures fullscreen mode based on `config.FULLSCREEN`."""
         if config.FULLSCREEN:
-            logger.info("Scheduling fullscreen mode...")
-            # Delay setting fullscreen slightly to allow window manager to initialize
-            self.after(100, self._apply_fullscreen)
+            logger.info("Binding fullscreen application to <Map> event...")
+            # Bind to the <Map> event, which fires when the window becomes visible
+            self.bind("<Map>", self._apply_fullscreen_event, add='+')
         else:
             logger.info("Fullscreen mode is disabled in configuration.")
+
+    def _apply_fullscreen_event(self, event=None):
+        """Event handler called when the window is mapped to apply fullscreen."""
+        # Unbind after first trigger to prevent multiple calls if window is hidden/shown
+        self.unbind("<Map>")
+        logger.info("Window mapped, attempting to apply fullscreen mode now...")
+        self._apply_fullscreen() # Call the original logic
 
     def _apply_fullscreen(self):
         """Applies the fullscreen attribute, called after a short delay."""
