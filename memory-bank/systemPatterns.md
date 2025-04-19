@@ -84,4 +84,4 @@ graph TD
 - **Configuration Loading & Application:** Correctly reading and applying the diverse settings from `config.py` throughout the application, especially in the GUI.
 - **Background Threading & GUI Updates:** Safely managing background data fetches and updating the CustomTkinter GUI without causing race conditions or errors.
 - **Service Reliability:** Robust handling of potential errors (network issues, API errors, unexpected data formats) within the `services` modules. Includes persistent caching as a fallback mechanism.
-- **GUI Rendering & Responsiveness:** Ensuring the CustomTkinter GUI renders correctly based on configuration and remains responsive despite background activity. Includes delayed fullscreen application for better compatibility.
+- **GUI Rendering & Responsiveness:** Ensuring the CustomTkinter GUI renders correctly based on configuration and remains responsive despite background activity. Includes applying fullscreen mode based on the window's `<Map>` event for better compatibility across platforms.

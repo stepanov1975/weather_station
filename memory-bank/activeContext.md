@@ -19,7 +19,9 @@
     - **Status Indicators:** Replaced previous error-specific status indicators with two persistent labels (`network_status_label`, `api_status_label`) in `_create_status_bar`.
     - Updated `update_status_indicators` method signature to accept `last_success_time`.
     - Implemented logic in `update_status_indicators` to always display network status and API status, including the formatted time of the last successful AccuWeather call.
-    - **Fullscreen Fix:** Modified `_configure_fullscreen` to call `self.attributes("-fullscreen", True)` via `self.after(100, ...)` to delay the call slightly, improving compatibility with window managers.
+    - **Fullscreen Fix (Attempt 1):** Modified `_configure_fullscreen` to call `self.attributes("-fullscreen", True)` via `self.after(100, ...)` to delay the call slightly.
+    - **Fullscreen Fix (Attempt 2):** Increased the delay in `_configure_fullscreen` to `self.after(500, ...)`.
+    - **Fullscreen Fix (Current):** Changed `_configure_fullscreen` to bind the `_apply_fullscreen` logic to the window's `<Map>` event instead of using `self.after()`. This triggers fullscreen when the window is actually displayed, aiming for better reliability on platforms like Raspberry Pi 4. Added `_apply_fullscreen_event` handler which unbinds itself after the first trigger.
     - **Bug Fix:** Removed an erroneous call to `update_status_indicators` from within `update_current_weather` that was causing a `TypeError` and preventing weather data display.
     - **Bug Fix:** Corrected indentation errors within the `_apply_fullscreen` method's exception handling.
 
@@ -36,7 +38,8 @@
 
 - Prioritized reducing unnecessary AccuWeather API calls through conditional fetching and persistent caching.
 - Improved user feedback by making status indicators persistent and more informative (including last success time).
-- Addressed GUI bugs related to status updates and fullscreen initialization.
+- Addressed GUI bugs related to status updates.
+- Iteratively improved fullscreen initialization logic for better platform compatibility (Raspberry Pi 4), moving from `self.after()` delays to event binding (`<Map>`).
 
 ## 5. Important Patterns & Preferences
 
@@ -51,5 +54,5 @@
 - Persistent caching for weather/forecast data improves the user experience during startup and temporary network/API outages.
 - Conditional fetching based on configuration (`OPTIONAL_ELEMENTS`) is an effective way to reduce API load.
 - Careful management of GUI updates from background threads is crucial.
-- Small delays (`self.after`) can sometimes resolve timing issues with window manager interactions (like fullscreen).
+- Using event bindings (like `<Map>`) can be more reliable than fixed delays (`self.after`) for handling window initialization events, especially across different platforms/window managers.
 - Thorough testing is needed after refactoring, as parameter changes in one method can affect callers (e.g., the `TypeError` in `update_current_weather`).

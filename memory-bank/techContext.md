@@ -57,4 +57,4 @@
 - **Bug Fixes (April 19, 2025 - Update 5):**
     - Corrected `TypeError` in `gui/app_window.py` caused by incorrect parameters passed to `update_status_indicators`.
     - Fixed indentation errors in `gui/app_window.py` related to fullscreen logic.
-    - Implemented delayed fullscreen application in `gui/app_window.py` using `self.after()` for better compatibility.
+    - **Fullscreen Improvement (April 19, 2025 - Update 6):** Replaced delayed fullscreen application (`self.after()`) with event binding (`<Map>`) in `gui/app_window.py` for potentially better reliability on platforms like Raspberry Pi 4.

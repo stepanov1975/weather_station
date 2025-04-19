@@ -32,7 +32,7 @@
     - Fixed `TypeError` for `get_day_name` arguments (`gui/app_window.py`).
     - Fixed `TypeError` related to `update_status_indicators` parameters (`gui/app_window.py`).
     - Fixed indentation errors in fullscreen logic (`gui/app_window.py`).
-- **Fullscreen Mode:** Application attempts to start in fullscreen (if configured) with a slight delay for better compatibility.
+- **Fullscreen Mode:** Application attempts to start in fullscreen (if configured) by binding the action to the window's `<Map>` event for better compatibility.
 
 ## 2. What's Left to Build / Verify
 
@@ -47,7 +47,7 @@
 - **API Optimization Implemented:** Conditional AQI fetching and persistent file caching for weather/forecast data added to `services/weather_api.py`.
 - **Status Indicators Enhanced:** GUI (`gui/app_window.py`) and main logic (`main.py`) updated to provide persistent network and API status, including the time of the last successful AccuWeather update.
 - **GUI Functionality Verified:** Core display elements (Time, Date, Temp, Humidity, AQI, Forecast) are functional after recent fixes.
-- **Fullscreen Behavior Improved:** Implemented delayed application of fullscreen attribute in `gui/app_window.py`.
+- **Fullscreen Behavior Improved:** Replaced delayed fullscreen application with `<Map>` event binding in `gui/app_window.py` for better reliability.
 - **Key Bugs Fixed:** Addressed `TypeError` in `update_status_indicators` call, indentation errors in fullscreen logic. Previous fixes for date parsing, icon loading, `NameError`, and `get_day_name` arguments remain.
 - **Documentation Updated:** Memory Bank files are being updated to reflect the latest changes.
 
@@ -70,5 +70,7 @@
     - Modified `main.py` to track and pass last AccuWeather success time.
     - Refactored status indicators in `gui/app_window.py` for persistent display.
     - Fixed `TypeError` in `update_current_weather` call to `update_status_indicators`.
-    - Implemented delayed fullscreen in `gui/app_window.py`.
+    - Implemented delayed fullscreen in `gui/app_window.py` (Attempt 1 & 2).
     - Fixed multiple indentation errors in `gui/app_window.py`.
+- **April 19, 2025 (Update 6 - Fullscreen Refinement):**
+    - Replaced delayed fullscreen (`self.after()`) with `<Map>` event binding in `gui/app_window.py` for improved reliability on Raspberry Pi 4.
