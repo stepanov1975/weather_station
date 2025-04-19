@@ -93,47 +93,94 @@ ACCUWEATHER_API_KEY = os.environ.get('ACCUWEATHER_API_KEY')
 # ==============================================================================
 # UI Settings (CustomTkinter Theming and Appearance)
 # ==============================================================================
+
+# --- Theme and Colors ---
 # Theme mode for the application ('dark' or 'light').
-# Affects the overall color scheme used by CustomTkinter widgets.
+# This sets the base theme for CustomTkinter widgets.
 DARK_MODE = True
 
-# Default font family to be used for most text elements in the UI.
-# Ensure this font is available on the target system (e.g., Raspberry Pi).
-FONT_FAMILY = "Helvetica"
+# Define explicit color palettes for light and dark modes.
+# These can override or supplement the default CTk theme colors.
+# Colors are used for backgrounds, text, accents, etc.
+# Format: (CTk Default Name, Hex Color Light, Hex Color Dark)
+# See CTk documentation for default theme color names.
+COLOR_THEME = {
+    "primary": ("blue", "#3B8ED0", "#1F6AA5"), # Example primary color
+    "secondary": ("green", "#2CC985", "#2FA572"), # Example secondary color
+    "background": ("gray", "#E5E5E5", "#242424"), # Main window background
+    "frame_background": ("gray", "#DBDBDB", "#2B2B2B"), # Frame background
+    "text": ("black", "#101010", "#DCE4EE"), # Default text color
+    "text_secondary": ("gray", "#606060", "#A0A0A0"), # Less prominent text
+    "accent": ("blue", "#3B8ED0", "#1F6AA5"), # Accent color for highlights
+    # Status Indicator Colors (overriding specific values below if needed)
+    "status_no_connection_bg": ("red", "#FF5555", "#C04040"),
+    "status_api_limit_bg": ("orange", "#FFA500", "#D08000"),
+    "status_api_error_bg": ("red", "#FF0000", "#A00000"),
+    "status_text": ("white", "#FFFFFF", "#FFFFFF"),
+}
 
-# --- Font Sizes (in points) ---
-# Base font size for the main time display (HH:MM).
-TIME_FONT_SIZE_BASE = 270
-# Additional points added to the base size for a larger time display effect.
-TIME_FONT_SIZE_INCREASE = 40
+# Select the active color palette based on DARK_MODE
+ACTIVE_COLORS = {name: colors[2] if DARK_MODE else colors[1] for name, colors in COLOR_THEME.items()}
 
-# Base font size for date elements like weekday and month/year.
-DATE_FONT_SIZE_BASE = 40
-# Additional points added to the base size for the large day number display.
-DATE_DAY_FONT_SIZE_INCREASE = 100
+# Set the default CTk color theme based on the primary color choice
+# Note: This sets the base theme; specific widget colors can still be overridden using ACTIVE_COLORS
+ctk_theme_name = COLOR_THEME["primary"][0] # e.g., "blue"
+# CTK_DEFAULT_COLOR_THEME = "blue" # Keep this simple for now, advanced theming can be complex
 
-# Font size for current weather information labels (e.g., "Temperature", "25°C").
-WEATHER_FONT_SIZE = 40
-# Font size for text within the forecast sections (day, temp range).
-FORECAST_FONT_SIZE = 45
-# Font size for the small status indicators (e.g., "API OK", "No Connection").
-STATUS_INDICATOR_FONT_SIZE = 14
+# --- Layout Structure ---
+# Defines the relative height proportions of the main UI regions.
+# Values represent weights for the grid rows.
+# Order: [Status Bar, Time/Date Region, Current Conditions Region, Forecast Region]
+# Status bar height is fixed by CONNECTION_FRAME_HEIGHT, so its weight is 0.
+# The remaining weights distribute the available vertical space.
+# Default: Time/Date=1/3, Current=1/4, Forecast=Remainder (~5/12)
+# Example weights to approximate this: Time=4, Current=3, Forecast=5 (total 12)
+REGION_HEIGHT_WEIGHTS = {
+    "status": 0, # Fixed height
+    "time_date": 4,
+    "current_conditions": 3,
+    "forecast": 5,
+}
 
-# --- Padding (in pixels) ---
-# Horizontal padding between major UI sections (e.g., time frame, weather frame).
-SECTION_PADDING_X = 5
-# Vertical padding between major UI sections.
-SECTION_PADDING_Y = 5
+# --- Fonts ---
+# Default font family used if a specific element doesn't define its own.
+DEFAULT_FONT_FAMILY = "Helvetica"
 
-# Horizontal padding around elements within a section (e.g., inside current weather).
-ELEMENT_PADDING_X = 5
-# Vertical padding around elements within a section.
-ELEMENT_PADDING_Y = 5
+# Font configurations for different UI elements.
+# Format: (Family, Size, Weight) - Weight can be "normal" or "bold".
+# Use DEFAULT_FONT_FAMILY if family is None.
+FONTS = {
+    "time": (None, 200, "bold"), # Large time display (HH:MM)
+    "weekday": (None, 40, "normal"), # Day of the week (e.g., "Sunday")
+    "day_number": (None, 140, "bold"), # Large day number (e.g., "21")
+    "month_year": (None, 40, "normal"), # Month and year (e.g., "April 2024")
+    "current_temp_value": (None, 80, "bold"), # Current temperature value
+    "current_temp_title": (None, 30, "bold"), # "Temperature" label
+    "current_humidity_value": (None, 80, "bold"), # Current humidity value
+    "current_humidity_title": (None, 30, "bold"), # "Humidity" label
+    "current_aqi_value": (None, 50, "bold"), # Air Quality Index value/category
+    "current_aqi_title": (None, 30, "bold"), # "Air Quality" label
+    "forecast_day": (None, 40, "bold"), # Day name in forecast (e.g., "Mon")
+    "forecast_condition": (None, 35, "normal"), # Weather condition text in forecast
+    "forecast_temp": (None, 35, "normal"), # Temperature range in forecast (e.g., "25° / 18°")
+    "status_indicator": (None, 14, "normal"), # Small text in status bar indicators
+}
 
-# Fine-grained horizontal padding specifically around text labels.
-TEXT_PADDING_X = 5
-# Fine-grained vertical padding specifically around text labels.
-TEXT_PADDING_Y = 2
+# --- Padding and Margins (in pixels) ---
+# Padding defines space *inside* a widget or frame border.
+# Margin defines space *outside* a widget or frame border.
+
+# Padding around the main content area within each major region frame.
+REGION_PADDING = {"padx": 10, "pady": 10}
+
+# Padding around individual elements *within* a region (e.g., labels in current weather).
+ELEMENT_PADDING = {"padx": 5, "pady": 5}
+
+# Padding specifically around text *inside* a label widget.
+TEXT_PADDING = {"padx": 5, "pady": 2}
+
+# Margins *between* elements within a layout (e.g., space between forecast day frames).
+ELEMENT_MARGINS = {"padx": 5, "pady": 5}
 
 # --- Sizes (in pixels) ---
 # Dimensions (width, height) for the weather icons displayed in the forecast.
@@ -141,33 +188,33 @@ FORECAST_ICON_SIZE = (96, 96)
 # Height of the top frame used to display connection and API status indicators.
 CONNECTION_FRAME_HEIGHT = 30
 
-# --- Colors ---
-# Note: Many colors are handled by the CustomTkinter theme (DARK_MODE).
-# These specific color definitions are primarily for custom elements like
-# status indicators or can serve as fallbacks if theming is disabled.
-
-# General background color (primarily used if not using CTk themes).
-BG_COLOR = "#1E1E1E"
-# General text color (primarily used if not using CTk themes).
-TEXT_COLOR = "#FFFFFF"
-# Accent color for highlighting elements (usage may vary).
-ACCENT_COLOR = "#3498DB"
-# Background color for secondary elements or sub-frames.
-SECONDARY_BG_COLOR = "#2D2D2D"
-
-# Specific colors for status indicators:
-# Background color for the 'No Internet Connection' indicator.
-NO_CONNECTION_COLOR = "#FF5555"  # Reddish
-# Background color for the 'AccuWeather API Limit Reached' indicator.
-API_LIMIT_COLOR = "#FFA500"  # Orange
-# Background color for a general 'API Error' indicator.
-API_ERROR_COLOR = "#FF0000"  # Bright Red
-# Text color used within the status indicator labels.
-STATUS_TEXT_COLOR = "#FFFFFF"  # White
-
 # --- Corner Radii (in pixels) ---
-# Defines how rounded the corners of the status indicator boxes are.
+# Defines how rounded the corners of frames and specific widgets are.
+FRAME_CORNER_RADIUS = 8
 STATUS_INDICATOR_CORNER_RADIUS = 5
+
+# --- Optional Elements ---
+# Flags to control the visibility of certain UI components.
+# Set to True to show, False to hide.
+OPTIONAL_ELEMENTS = {
+    "show_status_bar": True,
+    "show_current_humidity": True,
+    "show_current_air_quality": True,
+    # Add more flags here as needed, e.g., "show_forecast_condition_text"
+}
+
+# ==============================================================================
+# Data Refresh Rates
+# ==============================================================================
+# How often (in seconds) the displayed time and date should refresh.
+UPDATE_INTERVAL_TIME_DATE_SECONDS = 1
+
+# How often (in minutes) to fetch updated weather data from the IMS service.
+UPDATE_INTERVAL_IMS_MINUTES = 10
+
+# How often (in minutes) to fetch updated weather data (current, forecast, AQI)
+# from the AccuWeather service. Note AccuWeather's free tier limits.
+UPDATE_INTERVAL_ACCUWEATHER_MINUTES = 120
 
 # ==============================================================================
 # Mock Data Settings
