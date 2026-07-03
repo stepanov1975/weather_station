@@ -1,6 +1,8 @@
 """Regression tests for runtime lifecycle and IMS forecast caching."""
 
 import json
+import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -44,6 +46,20 @@ def test_default_log_file_is_outside_project_tree() -> None:
     assert not config.LOG_FILE_PATH.is_relative_to(config.PROJECT_ROOT)
     assert config.LOG_FILE_PATH.name == "weather_display.log"
     assert config.LOG_FILE_PATH.parent.name == "weather_display"
+
+
+def test_log_file_respects_xdg_state_home(tmp_path: Path) -> None:
+    script = "from weather_display import config; print(config.LOG_FILE_PATH)"
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        env={"XDG_STATE_HOME": str(tmp_path)},
+        text=True,
+    )
+
+    assert Path(result.stdout.strip()) == tmp_path / "weather_display" / "weather_display.log"
 
 
 def test_signal_shutdown_runs_cleanup_even_when_signal_flips_running() -> None:
