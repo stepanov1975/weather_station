@@ -5,12 +5,10 @@ This module centralizes all functionality related to multi-language support.
 It provides:
 - A master dictionary (`TRANSLATIONS`) holding text translations for various UI
   elements and messages, keyed by language code (e.g., 'en', 'ru').
-- Mappings for translating specific data received from APIs (like AccuWeather
-  AQI categories and weather condition phrases) into standardized internal keys,
-  which are then used to look up translations in `TRANSLATIONS`.
+- Mappings for translating weather condition phrases into standardized internal
+  keys, which are then used to look up translations in `TRANSLATIONS`.
 - Functions to retrieve translations (`get_translation`).
-- Functions to translate specific data types (`translate_aqi_category`,
-  `translate_weather_condition`).
+- Functions to translate weather condition text (`translate_weather_condition`).
 - Functions for formatting dates according to language conventions, using
   manually defined mappings for day and month names (`get_formatted_date`,
   `get_day_name_localized`).
@@ -20,7 +18,6 @@ The application's display language is determined by the `LANGUAGE` setting in
 """
 
 import logging
-import locale # Standard library for locale-specific operations (currently unused but potentially useful)
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -50,17 +47,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'current_weather': 'Current Weather',
         'temperature': 'Temperature',
         'humidity': 'Humidity',
-        'air_quality': 'Air Quality',
         'forecast': 'Forecast', # Added forecast title if needed
-
-        # Air Quality Index (AQI) Levels (Keys match ACCUWEATHER_AQI_CATEGORY_MAP values)
-        'air_good': 'Good',
-        'air_moderate': 'Moderate',
-        'air_unhealthy_sensitive': 'Unhealthy for Sensitive Groups',
-        'air_unhealthy': 'Unhealthy',
-        'air_very_unhealthy': 'Very Unhealthy',
-        'air_hazardous': 'Hazardous',
-        'air_unknown': 'Unknown AQI', # Specific key for unknown/missing AQI
 
         # General UI Text & Statuses
         'not_available': 'N/A',
@@ -95,7 +82,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'december': 'December',
 
         # Weather Condition Phrases (Keys match WEATHER_CONDITION_MAP values)
-        # These should cover expected phrases from the weather API (e.g., AccuWeather).
+        # These should cover expected phrases from weather sources.
         # Expand this list based on observed API responses.
         'sunny': 'Sunny',
         'partly_cloudy': 'Partly Cloudy',
@@ -118,20 +105,20 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'intermittent_clouds': 'Intermittent Clouds',
         'hazy_sunshine': 'Hazy Sunshine',
         'mostly_cloudy': 'Mostly Cloudy',
-        'dreary': 'Dreary', # AccuWeather specific?
-        'showers': 'Showers', # AccuWeather specific?
-        't_storms': 'T-Storms', # AccuWeather specific?
+        'dreary': 'Dreary',
+        'showers': 'Showers',
+        't_storms': 'T-Storms',
         'rain': 'Rain', # General rain
-        'flurries': 'Flurries', # AccuWeather specific?
+        'flurries': 'Flurries',
         'snow': 'Snow', # General snow
-        'ice': 'Ice', # AccuWeather specific?
-        'sleet': 'Sleet', # AccuWeather specific?
-        'freezing_rain': 'Freezing Rain', # AccuWeather specific?
-        'rain_and_snow': 'Rain and Snow', # AccuWeather specific?
-        'hot': 'Hot', # AccuWeather specific?
-        'cold': 'Cold', # AccuWeather specific?
-        'windy': 'Windy', # AccuWeather specific?
-        'hazy_moonlight': 'Hazy Moonlight', # AccuWeather specific?
+        'ice': 'Ice',
+        'sleet': 'Sleet',
+        'freezing_rain': 'Freezing Rain',
+        'rain_and_snow': 'Rain and Snow',
+        'hot': 'Hot',
+        'cold': 'Cold',
+        'windy': 'Windy',
+        'hazy_moonlight': 'Hazy Moonlight',
         # Add night variations if needed, or handle day/night logic elsewhere
         # e.g., 'partly_cloudy_night': 'Partly Cloudy Night'
     },
@@ -144,17 +131,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'current_weather': 'Текущая Погода',
         'temperature': 'Температура',
         'humidity': 'Влажность',
-        'air_quality': 'Качество Воздуха',
         'forecast': 'Прогноз',
-
-        # Air Quality Index (AQI) Levels
-        'air_good': 'Хорошее',
-        'air_moderate': 'Умеренное',
-        'air_unhealthy_sensitive': 'Вредно для чувствительных групп',
-        'air_unhealthy': 'Вредное',
-        'air_very_unhealthy': 'Очень вредное',
-        'air_hazardous': 'Опасное',
-        'air_unknown': 'Качество неизвестно',
 
         # General UI Text & Statuses
         'not_available': 'Н/Д', # Not Available abbreviation
@@ -324,67 +301,6 @@ def get_translation(key: str, language: str = 'en') -> str:
 # Specific Data Translation Maps and Functions
 # ==============================================================================
 
-# --- Air Quality Index (AQI) Category Translation ---
-
-# This map translates the category strings received directly from the AccuWeather API
-# (e.g., "Good", "Moderate") into the internal translation keys used in the
-# `TRANSLATIONS` dictionary (e.g., "air_good", "air_moderate"). This decouples
-# the API's specific wording from the application's internal translation system.
-ACCUWEATHER_AQI_CATEGORY_MAP: Dict[str, str] = {
-    # Case-sensitive keys matching expected API responses
-    "Good": "air_good",
-    "Moderate": "air_moderate",
-    "Unhealthy for Sensitive Groups": "air_unhealthy_sensitive",
-    "Unhealthy": "air_unhealthy",
-    "Very Unhealthy": "air_very_unhealthy",
-    "Hazardous": "air_hazardous",
-    "Excellent": "air_good", # Map "Excellent" to the same key as "Good"
-    # Add more mappings here if other categories are observed from AccuWeather API
-}
-
-def translate_aqi_category(category: Optional[str], language: str = 'en') -> str:
-    """
-    Translates an AccuWeather AQI category string into the specified language.
-
-    Uses the `ACCUWEATHER_AQI_CATEGORY_MAP` to find the internal translation key
-    corresponding to the API's category string, then uses `get_translation`
-    to retrieve the text in the target language.
-
-    Args:
-        category (Optional[str]): The AQI category string received from the
-                                  AccuWeather API (e.g., "Good", "Moderate").
-                                  Can be None if AQI data is unavailable.
-        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
-
-    Returns:
-        str: The translated AQI category string (e.g., "Хорошее"). Returns a
-             localized "Unknown AQI" string if the input `category` is None.
-             Returns the original `category` string if it's not found in the
-             `ACCUWEATHER_AQI_CATEGORY_MAP`.
-    """
-    if category is None:
-        # Handle cases where AQI data might be missing entirely
-        logger.debug("translate_aqi_category called with None category. Returning 'unknown'.")
-        return get_translation('air_unknown', language)
-
-    # Find the internal translation key corresponding to the API category string
-    translation_key = ACCUWEATHER_AQI_CATEGORY_MAP.get(category)
-
-    if translation_key:
-        # If a mapping exists, get the translation for that key
-        translated_text = get_translation(translation_key, language)
-        logger.debug(f"Translated AQI category '{category}' (key: '{translation_key}') to '{translated_text}' for language '{language}'.")
-        return translated_text
-    else:
-        # If the category string from the API is not in our map, log a warning
-        # and return the original, untranslated string. This helps identify
-        # new or unexpected categories from the API.
-        logger.warning(
-            f"No translation mapping found in ACCUWEATHER_AQI_CATEGORY_MAP for "
-            f"AQI category: '{category}'. Returning the original string."
-        )
-        return category
-
 # --- Weather Condition Phrase Translation ---
 
 # This map attempts to translate common weather condition phrases (expected from API)
@@ -409,25 +325,25 @@ WEATHER_CONDITION_MAP: Dict[str, str] = {
     'heavy rain': 'heavy_rain',
     'patchy rain': 'patchy_rain',
     'patchy rain nearby': 'patchy_rain_nearby',
-    'showers': 'showers', # Often used by AccuWeather
+    'showers': 'showers',
     'freezing rain': 'freezing_rain',
     # Snow variations
     'light snow': 'light_snow',
     'moderate snow': 'moderate_snow',
     'heavy snow': 'heavy_snow',
     'patchy snow': 'patchy_snow',
-    'flurries': 'flurries', # AccuWeather specific?
+    'flurries': 'flurries',
     'sleet': 'sleet',
     'rain and snow': 'rain_and_snow',
     # Storms
     'thunderstorm': 'thunderstorm',
-    't-storms': 't_storms', # Abbreviation often used by AccuWeather
-    # AccuWeather specific / Other
+    't-storms': 't_storms',
+    # Other common phrases
     'mostly sunny': 'mostly_sunny',
     'intermittent clouds': 'intermittent_clouds',
     'hazy sunshine': 'hazy_sunshine',
     'mostly cloudy': 'mostly_cloudy',
-    'dreary': 'dreary', # AccuWeather specific?
+    'dreary': 'dreary',
     'ice': 'ice',
     'hot': 'hot',
     'cold': 'cold',
@@ -596,39 +512,3 @@ def get_day_name_localized(date_str: Optional[str], language: str = 'en') -> str
         logger.error(f"Could not parse date string '{date_str}' to determine day name: {e}")
         return get_translation('unknown', language)
 
-
-# ==============================================================================
-# Deprecated/Unused Functions (Marked for Review/Removal)
-# ==============================================================================
-
-def get_air_quality_text_localized(index: int, language: str = 'en') -> str:
-    """
-    DEPRECATED: Converts an old AQI index (1-6) to localized descriptive text.
-
-    WARNING: This function uses a mapping based on the old WeatherAPI.com index
-             system (1-6). The application now primarily uses category strings
-             (e.g., "Good", "Moderate") from AccuWeather, which are translated
-             by the `translate_aqi_category` function. This function is likely
-             unused and should be removed after verifying it's not called anywhere.
-
-    Args:
-        index (int): Air quality index (expected 1-6 based on old system).
-        language (str): The target language code. Defaults to 'en'.
-
-    Returns:
-        str: Localized descriptive text for the air quality index.
-    """
-    # Mapping based on the old WeatherAPI.com AQI index (1-6)
-    aqi_keys_deprecated = {
-        1: 'air_good',
-        2: 'air_moderate',
-        3: 'air_unhealthy_sensitive',
-        4: 'air_unhealthy',
-        5: 'air_very_unhealthy',
-        6: 'air_hazardous'
-    }
-    logger.warning("Call to DEPRECATED function: get_air_quality_text_localized. This likely needs removal.")
-    # Find the translation key based on the old index
-    key = aqi_keys_deprecated.get(index, 'air_unknown')
-    # Return the translation using the standard function
-    return get_translation(key, language)

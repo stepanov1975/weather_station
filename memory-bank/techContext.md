@@ -1,63 +1,31 @@
-# Technical Context: Weather Claude
+# Technical Context
 
-## 1. Core Technologies
+## Stack
 
-- **Language:** Python (Version 3.7+ recommended based on dependencies like CustomTkinter).
-- **GUI Framework:** CustomTkinter (`customtkinter>=5.0.0`) - A modern UI toolkit based on Tkinter.
-- **Image Handling:** Pillow (`pillow>=9.0.0`) - Used for image processing, primarily for loading weather icons via `WeatherIconHandler`.
-- **HTTP Requests:** Requests (`requests>=2.25.0`) - Used for making API calls to fetch weather data from AccuWeather and the IMS XML feed.
-- **Timezone Handling:** Pytz (`pytz>=2023.3`) - Used for managing timezones, specifically for converting IMS observation times to the local Israel timezone.
+- Python 3.11
+- CustomTkinter for the kiosk UI
+- Requests for IMS HTTP calls
+- Pillow for weather icon loading
+- Pytest for tests
+- Ruff for linting
+- Mypy for type checking
 
-## 2. Development Environment & Tooling
+## Standard Commands
 
-- **Package Management:** `pip` with `requirements.txt` for application dependencies and `requirements-dev.txt` for development dependencies. Virtual environment (`weather_venv`) recommended.
-- **Testing Framework:** Pytest (`pytest>=7.0.0`) with code coverage via `pytest-cov>=4.0.0`. (Tests may need updating based on recent changes).
-- **Packaging:** Standard Python setuptools (`setup.py`, `MANIFEST.in`).
-- **Version Control:** Git (implied by `.gitignore`).
-- **Documentation:** Docstrings added throughout the `weather_display` package (modules, classes, functions) following PEP 8 guidelines. `README.md` updated.
+```bash
+./weather_venv/bin/python -m pytest
+./weather_venv/bin/python -m ruff check .
+./weather_venv/bin/python -m mypy weather_display
+```
 
-## 3. Technical Constraints & Considerations
+## Weather Sources
 
-- Requires Python 3.7+ installation.
-- Depends on external libraries specified in `requirements.txt`.
-- Network connectivity required to fetch live weather data (unless using `--mock`).
-- Requires a valid AccuWeather API key (provided via environment variable or command-line) for forecast/AQI data. IMS feed is public.
-- GUI operation requires a graphical desktop environment (e.g., Raspberry Pi OS Desktop, not Lite). `DISPLAY` environment variable must be set.
-- Font availability (defined in `config.FONTS`, defaulting to `Helvetica`) on the target system is necessary for correct UI rendering.
-- Potential API rate limits for AccuWeather free tier need to be considered (handled partially by caching and status indicators).
-- The extensive UI configuration options in `config.py` require careful management to ensure valid settings.
+- Current observations: IMS last-hour XML feed.
+- Forecast: IMS city portal, configured with `IMS_CITY_LOCATION_ID = 18` for
+  Hadera.
 
-## 4. Dependencies
+## Startup
 
-- **Runtime:** `customtkinter`, `pillow`, `pytz`, `requests`.
-- **Development/Testing:** `pytest`, `pytest-cov`.
-
-## 5. Tool Usage Patterns
-
-- **Installation:** `pip install -r requirements.txt` (ideally within a virtual environment).
-- **Running:** `python run_weather_display.py [options]` from the project root directory. Requires `ACCUWEATHER_API_KEY` to be set or passed via `--api-key` for live AccuWeather data.
-- **Testing:** `pytest` in the project root directory (tests might need review/updates).
-- **Packaging:** `python setup.py sdist bdist_wheel` (standard commands).
-- **Listing IMS Stations:** `python weather_display/services/ims_lasthour.py --list`
-
-## 6. Recent Technical Changes (April 19, 2025)
-
-- **Documentation:** Added comprehensive docstrings to all modules, classes, and functions within the `weather_display` package.
-- **Bug Fix (`NameError`):** Resolved an issue in `utils/helpers.py` by adding `from typing import List`.
-- **Bug Fix (`TypeError`):** Corrected the function call to `get_day_name` in `gui/app_window.py` to pass the correct number of arguments.
-- **GUI Refactoring:**
-    - Overhauled `gui/app_window.py` to use a modular, configuration-driven approach based on CustomTkinter.
-    - Significantly expanded `config.py` with detailed UI settings (layout, fonts, colors, padding, margins, optional elements).
-- **API Optimization & Caching (April 19, 2025 - Update 4):**
-    - Implemented conditional fetching for AQI in `services/weather_api.py` based on `config.OPTIONAL_ELEMENTS`.
-    - Added persistent file caching for current weather and forecast data in `services/weather_api.py` (`current_weather_cache.json`, `forecast_cache.json`).
-- **Status Indicator Improvements (April 19, 2025 - Update 5):**
-    - Modified `main.py` to track and pass the last successful AccuWeather update time.
-    - Refactored status indicators in `gui/app_window.py` to be persistent, displaying network status and detailed API status (including last success time).
-- **Bug Fixes (April 19, 2025 - Update 5):**
-    - Corrected `TypeError` in `gui/app_window.py` caused by incorrect parameters passed to `update_status_indicators`.
-    - Fixed indentation errors in `gui/app_window.py` related to fullscreen logic.
-    - **Fullscreen Improvement (April 19, 2025 - Update 6):** Replaced delayed fullscreen application (`self.after()`) with event binding (`<Map>`) in `gui/app_window.py` for potentially better reliability on platforms like Raspberry Pi 4.
-    - **Configuration Update (April 19, 2025 - Update 7):** Added `status_ok_text`, `status_warning_text`, `status_error_text` keys to `COLOR_THEME` in `config.py`.
-    - **Logging Update (April 19, 2025 - Update 8):** Replaced basic `FileHandler` with `logging.handlers.TimedRotatingFileHandler` in `main.py` to enable daily log rotation at midnight. Added error handling around file handler initialization to log issues to console.
-    - **Startup Optimization (April 19, 2025 - Update 9):** Modified `main.py` to prioritize using valid cached AccuWeather data on initial startup via a new `_initial_accuweather_update` method, reducing unnecessary API calls at launch.
+The app should be launched from the repository or installed package without any
+weather API key. Raspberry Pi boot must not fail just because the network is not
+ready yet.

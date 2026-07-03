@@ -18,7 +18,7 @@ preferred for clarity.
 
 # Example of exposing a class at the package level:
 # This allows `from weather_display.utils import WeatherIconHandler`
-from .icon_handler import WeatherIconHandler
+from .icon_handler import WeatherIconHandler as WeatherIconHandler
 
 # Other commonly used utilities could potentially be exposed here as well,
 # but weigh convenience against the explicitness of direct module imports.

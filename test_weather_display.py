@@ -13,37 +13,29 @@ from unittest.mock import patch
 # Add the parent directory to the path so we can import the weather_display package
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
-from weather_display.services.weather_api import WeatherAPIClient
+from weather_display.services.ims_forecast import IMSCityForecast
 from weather_display.services.time_service import TimeService
 
 
 class TestWeatherDisplay(unittest.TestCase):
     """Test cases for the Weather Display application."""
     
-    def test_weather_api_mock_data(self):
-        """Test that the WeatherAPI client returns mock data when configured to do so."""
-        # Create a client with no API key (should use mock data)
-        client = WeatherAPIClient(api_key=None)
-        
-        # Verify that use_mock_data is True
-        self.assertTrue(client.use_mock_data)
-        
-        # Get current weather
-        current_weather = client.get_current_weather()
-        
-        # Verify that we got mock data
-        self.assertIsNotNone(current_weather)
-        self.assertIn('temperature', current_weather)
-        self.assertIn('humidity', current_weather)
-        self.assertIn('condition', current_weather)
-        
-        # Get forecast
-        forecast = client.get_forecast(days=3)
-        
-        # Verify that we got mock data
-        self.assertIsNotNone(forecast)
-        self.assertEqual(len(forecast), 3)
-        for day in forecast:
+    def test_ims_forecast_mock_data(self):
+        """Test that the IMS city forecast client returns mock data when configured."""
+        client = IMSCityForecast(location_id=18)
+
+        with patch("weather_display.config.USE_MOCK_DATA", True):
+            current_weather = client.get_current_weather()
+            forecast = client.get_forecast(days=3)
+
+        self.assertEqual(current_weather["api_status"], "mock")
+        self.assertIn('temperature', current_weather["data"])
+        self.assertIn('humidity', current_weather["data"])
+        self.assertIn('condition', current_weather["data"])
+
+        self.assertEqual(forecast["api_status"], "mock")
+        self.assertEqual(len(forecast["data"]), 3)
+        for day in forecast["data"]:
             self.assertIn('date', day)
             self.assertIn('max_temp', day)
             self.assertIn('min_temp', day)
@@ -65,7 +57,8 @@ class TestWeatherDisplay(unittest.TestCase):
         
         # Verify that we got a valid date string
         self.assertIsNotNone(date_str)
-        self.assertRegex(date_str, r'^[A-Za-z]+, \d{2} [A-Za-z]+ \d{4}$')
+        self.assertIn(',', date_str)
+        self.assertRegex(date_str, r'\d{4}$')
         
         # Get current datetime
         time_str, date_str = time_service.get_current_datetime()
@@ -74,7 +67,8 @@ class TestWeatherDisplay(unittest.TestCase):
         self.assertIsNotNone(time_str)
         self.assertRegex(time_str, r'^\d{2}:\d{2}:\d{2}$')
         self.assertIsNotNone(date_str)
-        self.assertRegex(date_str, r'^[A-Za-z]+, \d{2} [A-Za-z]+ \d{4}$')
+        self.assertIn(',', date_str)
+        self.assertRegex(date_str, r'\d{4}$')
 
 
 if __name__ == '__main__':

@@ -1,5 +1,32 @@
 # AGENTS.md
 
+## Repo Workflow
+
+- Use the existing Python virtual environment at `./weather_venv` when running tools.
+- Use `pytest` for tests.
+- Use `ruff` for linting.
+- Use `mypy` for type checking.
+- Prefer running focused checks while editing, then run the full verification set before handing work back.
+
+## Standard Commands
+
+```bash
+./weather_venv/bin/python -m pytest
+./weather_venv/bin/python -m ruff check .
+./weather_venv/bin/python -m mypy weather_display
+```
+
+If the virtual environment is missing development tools, install them from:
+
+```bash
+./weather_venv/bin/python -m pip install -r requirements-dev.txt
+```
+
+## Notes
+
+- The app is a Raspberry Pi weather display using IMS data.
+- Avoid reintroducing old weather API-key startup arguments.
+- Do not commit generated logs, caches, or `__pycache__` files.
 
 ## 1. Think Before Coding
 
@@ -44,18 +71,16 @@ The test: Every changed line should trace directly to the user's request.
 **Define success criteria. Loop until verified.**
 
 Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
+- "Add validation" -> "Write tests for invalid inputs, then make them pass"
+- "Fix the bug" -> "Write a test that reproduces it, then make it pass"
+- "Refactor X" -> "Ensure tests pass before and after"
 
 For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
+
+```text
+1. [Step] -> verify: [check]
+2. [Step] -> verify: [check]
+3. [Step] -> verify: [check]
 ```
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
-
----
-

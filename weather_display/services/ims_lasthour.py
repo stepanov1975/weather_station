@@ -27,7 +27,7 @@ import os
 import datetime
 import pytz # For timezone handling
 import logging
-from typing import Dict, Any, Optional, List, Set, Tuple
+from typing import Dict, Any, Optional
 
 # Get a logger instance specific to this module
 logger = logging.getLogger(__name__)
@@ -606,7 +606,8 @@ class IMSLastHourWeather:
 
                 if stn_name_elem is not None and stn_name_elem.text:
                     station_name = stn_name_elem.text.strip()
-                    if not station_name: continue # Skip if name is empty
+                    if not station_name:
+                        continue
 
                     attributes: Dict[str, str] = {}
                     if stn_num_elem is not None and stn_num_elem.text:

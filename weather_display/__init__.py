@@ -6,10 +6,10 @@ and present weather information on a display, particularly suited for devices
 like the Raspberry Pi 4.
 
 It encompasses several key sub-packages and modules:
-- config: Handles application settings and API keys.
+- config: Handles application and IMS location settings.
 - gui: Manages the graphical user interface elements and layout.
-- services: Contains clients for interacting with external weather APIs (e.g.,
-  AccuWeather, IMS) and time services.
+- services: Contains clients for interacting with IMS weather data and time
+  services.
 - utils: Provides helper functions, localization support, and weather icon
   management.
 """

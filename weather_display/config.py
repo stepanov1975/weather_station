@@ -1,38 +1,20 @@
-"""
-Centralized Configuration for the Weather Display Application.
+"""Centralized configuration for the weather display application."""
 
-This module consolidates all user-configurable settings and constants required
-for the Weather Display application. By centralizing these values, it simplifies
-management, customization, and maintenance of the application's behavior.
-
-Settings include:
-- General application parameters (title, language, dimensions).
-- API endpoint details and keys (AccuWeather, IMS).
-- Data refresh intervals for different services.
-- Location settings for weather data retrieval.
-- User interface (UI) customizations (theme, fonts, colors, padding, sizes).
-- Flags for enabling/disabling features like fullscreen or mock data usage.
-
-It is recommended to configure sensitive information like API keys using
-environment variables for better security practices, although defaults can be
-set here.
-"""
-import os
-
+from pathlib import Path
 # ==============================================================================
 # Application Settings
 # ==============================================================================
 # The title displayed in the application window's title bar.
 APP_TITLE = "Weather Display"
 
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+LOG_FILE_PATH = PROJECT_ROOT / "weather_display.log"
+IMS_FORECAST_CACHE_PATH = PROJECT_ROOT / "forecast_cache.json"
+
 # Language code for UI text localization (e.g., 'en', 'he', 'ru').
 # Affects translations provided by the localization utility.
 LANGUAGE = "ru"
 
-# Language code specifically for requests to the AccuWeather API.
-# This determines the language of descriptive text returned by AccuWeather.
-# Format examples: "en-us", "he-il".
-ACCUWEATHER_LANGUAGE = "en-us"
 
 # Initial width of the application window in pixels when not in fullscreen.
 APP_WIDTH = 1440
@@ -50,17 +32,14 @@ UPDATE_INTERVAL_SECONDS = 1
 # How often (in minutes) to fetch updated weather data from the IMS service.
 IMS_UPDATE_INTERVAL_MINUTES = 10
 
-# How often (in minutes) to fetch updated weather data (current, forecast, AQI)
-# from the AccuWeather service. Note AccuWeather's free tier limits.
-ACCUWEATHER_UPDATE_INTERVAL_MINUTES = 120
+# How often (in minutes) to fetch updated forecast data from the IMS city portal.
+IMS_FORECAST_UPDATE_INTERVAL_MINUTES = 120
 
 # ==============================================================================
 # Location Settings
 # ==============================================================================
-# The geographical location for which to fetch weather data.
-# This is primarily used by the AccuWeather service to find a location key.
-# Format: "City,Country" or "City,State,Country".
-LOCATION = "Hadera,Israel"
+# IMS city portal location id for Hadera.
+IMS_CITY_LOCATION_ID = 18
 
 # ==============================================================================
 # API Settings (IMS - Israel Meteorological Service)
@@ -73,22 +52,6 @@ IMS_STATION_NAME = "En Hahoresh"
 # The URL for the IMS last hour data feed (XML format).
 # Defined here for reference, but typically used directly within the IMS service class.
 # IMS_URL = "https://ims.gov.il/sites/default/files/ims_data/xml_files/imslasthour.xml"
-
-# ==============================================================================
-# API Settings (AccuWeather)
-# ==============================================================================
-# The base URL for all AccuWeather API requests.
-ACCUWEATHER_BASE_URL = "http://dataservice.accuweather.com"
-
-# Your AccuWeather Developer API Key.
-# **SECURITY WARNING**: Avoid hardcoding the API key directly in the code.
-# It is STRONGLY recommended to set this using the 'ACCUWEATHER_API_KEY'
-# environment variable.
-# The application prioritizes keys in this order:
-# 1. Command-line argument (`--api-key`)
-# 2. Environment variable (`ACCUWEATHER_API_KEY`)
-# 3. This config file value (ACCUWEATHER_API_KEY) - Least preferred method.
-ACCUWEATHER_API_KEY = os.environ.get('ACCUWEATHER_API_KEY')
 
 # ==============================================================================
 # UI Settings (CustomTkinter Theming and Appearance)
@@ -162,8 +125,6 @@ FONTS = {
     "current_temp_title": (None, 30, "bold"), # "Temperature" label
     "current_humidity_value": (None, 80, "bold"), # Current humidity value
     "current_humidity_title": (None, 30, "bold"), # "Humidity" label
-    "current_aqi_value": (None, 40, "bold"), # Air Quality Index value/category
-    "current_aqi_title": (None, 30, "bold"), # "Air Quality" label
     "forecast_day": (None, 40, "bold"), # Day name in forecast (e.g., "Mon")
     "forecast_condition": (None, 35, "normal"), # Weather condition text in forecast
     "forecast_temp": (None, 35, "normal"), # Temperature range in forecast (e.g., "25° / 18°")
@@ -203,28 +164,14 @@ STATUS_INDICATOR_CORNER_RADIUS = 5
 OPTIONAL_ELEMENTS = {
     "show_status_bar": True,
     "show_current_humidity": True,
-    "show_current_air_quality": True,
     # Add more flags here as needed, e.g., "show_forecast_condition_text"
 }
-
-# ==============================================================================
-# Data Refresh Rates
-# ==============================================================================
-# How often (in seconds) the displayed time and date should refresh.
-UPDATE_INTERVAL_TIME_DATE_SECONDS = 1
-
-# How often (in minutes) to fetch updated weather data from the IMS service.
-UPDATE_INTERVAL_IMS_MINUTES = 10
-
-# How often (in minutes) to fetch updated weather data (current, forecast, AQI)
-# from the AccuWeather service. Note AccuWeather's free tier limits.
-UPDATE_INTERVAL_ACCUWEATHER_MINUTES = 120
 
 # ==============================================================================
 # Mock Data Settings
 # ==============================================================================
 # If True, the application will use predefined mock data instead of making
-# live calls to the weather APIs. Useful for UI development and testing
-# without consuming API quotas or requiring an internet connection.
+# live calls to IMS. Useful for UI development and testing without requiring
+# an internet connection.
 # Set to False for normal operation.
 USE_MOCK_DATA = False

@@ -15,7 +15,6 @@ from typing import Tuple
 
 # Third-party imports
 import customtkinter as ctk
-from PIL import Image # Required by CTkImage, even if not used directly here
 
 # Local application imports
 try:
@@ -83,7 +82,7 @@ class WeatherIconsDemo(ctk.CTk):
         # --- Title ---
         title_label = ctk.CTkLabel(
             self,
-            text="AccuWeather Icon Set Demonstration",
+            text="Weather Icon Set Demonstration",
             font=ctk.CTkFont(size=24, weight="bold")
         )
         title_label.pack(pady=PAD_Y)
@@ -99,7 +98,7 @@ class WeatherIconsDemo(ctk.CTk):
         """Create and arrange the icon widgets within the parent frame."""
         row, col = 0, 0
 
-        # Separate icon codes into day (1-32) and night (33-44) based on AccuWeather standard
+        # Separate icon codes into day and night groups based on the local icon mapping.
         day_icons = sorted([code for code in self.icon_handler.ICON_MAPPING if 1 <= code <= 32])
         night_icons = sorted([code for code in self.icon_handler.ICON_MAPPING if 33 <= code <= 44])
 
@@ -150,7 +149,7 @@ class WeatherIconsDemo(ctk.CTk):
 
         Args:
             parent: The parent frame (the scrollable frame).
-            icon_code: The AccuWeather icon code to display.
+            icon_code: The local weather icon code to display.
             grid_row: The grid row position for this widget.
             grid_col: The grid column position for this widget.
         """

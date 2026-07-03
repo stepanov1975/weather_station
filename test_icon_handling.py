@@ -3,30 +3,24 @@
 Tests for the WeatherIconHandler class.
 
 This script tests the functionality of the WeatherIconHandler class:
-- Getting icon paths based on AccuWeather codes
+- Getting icon paths based on local weather icon codes
 - Getting icons based on condition text
-- Downloading icons
+- Verifying bundled icons
 """
 
-import os
-import sys
 import logging
+import os
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
+
+# Import our icon handler
+from weather_display.utils.icon_handler import WeatherIconHandler
 
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
-logger = logging.getLogger(__name__)
-
-# Add the project root to Python path to allow importing from weather_display
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, project_root)
-
-# Import our icon handler
-from weather_display.utils.icon_handler import WeatherIconHandler
 
 class TestWeatherIconHandler(unittest.TestCase):
     """Test cases for the WeatherIconHandler class."""
@@ -39,6 +33,7 @@ class TestWeatherIconHandler(unittest.TestCase):
         """Test getting an icon path from a code."""
         # Test a valid icon code
         path = self.icon_handler.get_icon_path(1)  # Sunny
+        assert path is not None
         self.assertIsNotNone(path)
         self.assertTrue(os.path.exists(path) or path.endswith("01_sunny.png"))
         
@@ -46,16 +41,27 @@ class TestWeatherIconHandler(unittest.TestCase):
         with patch('logging.Logger.warning') as mock_warning:
             path = self.icon_handler.get_icon_path(999)  # Invalid code
             mock_warning.assert_called_once()
+
+    def test_icon_directory_uses_packaged_assets(self):
+        """Test icons are loaded from package data, not the old top-level asset copy."""
+        expected_dir = os.path.abspath(
+            os.path.join(os.path.dirname(__file__), "weather_display", "assets", "weather_icons")
+        )
+
+        self.assertEqual(os.path.abspath(self.icon_handler.icon_dir), expected_dir)
+        self.assertEqual(self.icon_handler.verify_all_icons(), len(self.icon_handler.ICON_MAPPING))
     
     def test_get_icon_by_condition(self):
         """Test getting an icon path from a condition text."""
         # Test exact match
         path = self.icon_handler.get_icon_by_condition("Sunny")
+        assert path is not None
         self.assertIsNotNone(path)
         self.assertTrue(os.path.exists(path) or path.endswith("01_sunny.png"))
         
         # Test case-insensitive match
         path = self.icon_handler.get_icon_by_condition("sunny")
+        assert path is not None
         self.assertIsNotNone(path)
         self.assertTrue(os.path.exists(path) or path.endswith("01_sunny.png"))
         
@@ -66,32 +72,15 @@ class TestWeatherIconHandler(unittest.TestCase):
         # Test nonexistent condition
         with patch('logging.Logger.warning') as mock_warning:
             path = self.icon_handler.get_icon_by_condition("Not a real weather condition")
-            mock_warning.assert_called_once()
+            self.assertIsNotNone(path)
+            self.assertGreaterEqual(mock_warning.call_count, 1)
     
-    @patch('requests.get')
-    def test_download_icon(self, mock_get):
-        """Test downloading an icon."""
-        # Mock the requests.get response
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        # Create a simple file-like object for the mock response content
-        mock_response.iter_content.return_value = [b'test_image_content']
-        mock_get.return_value = mock_response
-        
-        # Test downloading an icon
-        with patch('builtins.open', unittest.mock.mock_open()) as mock_file:
-            result = self.icon_handler._download_icon(1, "test_path.png")
-            self.assertTrue(result)
-            mock_file.assert_called_once_with("test_path.png", 'wb')
-    
-    def test_download_all_icons(self):
-        """Test downloading all icons."""
-        # Mock the _download_icon method to avoid actual downloads
-        with patch.object(self.icon_handler, '_download_icon') as mock_download:
-            mock_download.return_value = True
-            count = self.icon_handler.download_all_icons()
-            # Should call _download_icon for each icon in ICON_MAPPING
-            self.assertEqual(count, len(mock_download.call_args_list))
+    def test_verify_all_icons(self):
+        """Test verifying bundled icons."""
+        with patch('os.path.exists') as mock_exists:
+            mock_exists.return_value = True
+            count = self.icon_handler.verify_all_icons()
+            self.assertEqual(count, len(self.icon_handler.ICON_MAPPING))
     
     def test_load_icon(self):
         """Test loading an icon as a CTkImage."""

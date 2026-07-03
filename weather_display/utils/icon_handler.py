@@ -3,9 +3,8 @@ Weather Icon Handling Utility for the Weather Display Application.
 
 This module provides the `WeatherIconHandler` class, which is responsible for
 managing weather icons used in the application's GUI. It handles:
-- Mapping AccuWeather's numeric icon codes to descriptive names and local filenames.
+- Mapping weather icon codes to descriptive names and local filenames.
 - Determining the correct local path for an icon based on its code.
-- Downloading missing icon image files from the AccuWeather developer source URL.
 - Loading icon images from files into `customtkinter.CTkImage` objects suitable
   for display, handling resizing.
 - Caching loaded `CTkImage` objects in memory to improve performance and avoid
@@ -18,11 +17,9 @@ managing weather icons used in the application's GUI. It handles:
 import os
 import logging
 from datetime import datetime
-from typing import Dict, Optional, Tuple, Any
+from typing import Dict, Optional, Tuple
 
 # Third-party imports
-import requests # For downloading icons
-from PIL import Image # For opening image files before creating CTkImage
 import customtkinter as ctk # For the CTkImage object used in the GUI
 
 # Local application imports
@@ -34,20 +31,19 @@ logger = logging.getLogger(__name__)
 
 class WeatherIconHandler:
     """
-    Manages weather icons: mapping codes, downloading, loading, and caching.
+    Manages weather icons: mapping codes, loading, and caching.
 
     This class centralizes all logic related to weather icons. It uses a predefined
-    mapping (`ICON_MAPPING`) from AccuWeather numeric codes to internal names.
-    It ensures icons are available locally, downloading them if necessary, and
+    mapping (`ICON_MAPPING`) from numeric weather icon codes to internal names and
     provides loaded `CTkImage` objects suitable for the CustomTkinter GUI,
     complete with caching.
 
     Attributes:
         ICON_MAPPING (Dict[int, Dict[str, str]]): A class-level dictionary mapping
-            AccuWeather icon codes (int) to dictionaries containing an internal
+            weather icon codes (int) to dictionaries containing an internal
             'name' (used for filenames) and a 'description' (for reference).
         icon_dir (str): The absolute path to the local directory where weather
-                        icon image files (.png) are stored or will be downloaded to.
+                        icon image files (.png) are stored.
         icon_cache (Dict[str, ctk.CTkImage]): An in-memory cache storing loaded
             `CTkImage` objects. Keys are strings combining the icon code and
             requested size (e.g., "1_64x64") to allow caching of different sizes.
@@ -56,15 +52,13 @@ class WeatherIconHandler:
     # Define the base directory relative to this file's location where icons are stored.
     # Assumes icon_handler.py is in weather_display/utils/
     _MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
-    _UTILS_DIR = os.path.dirname(_MODULE_DIR)
-    _PACKAGE_DIR = os.path.dirname(_UTILS_DIR)
+    _PACKAGE_DIR = os.path.dirname(_MODULE_DIR)
     _ICON_BASE_DIR = os.path.join(_PACKAGE_DIR, "assets", "weather_icons")
     logger.debug(f"Icon base directory set to: {_ICON_BASE_DIR}")
 
-    # --- AccuWeather Icon Code Mapping ---
-    # Maps the numeric code returned by the AccuWeather API to an internal name
-    # (used for filenames) and a human-readable description.
-    # Reference: https://developer.accuweather.com/weather-icons
+    # --- Weather Icon Code Mapping ---
+    # These codes match the bundled local icon filenames and are used as the
+    # display's internal icon vocabulary.
     ICON_MAPPING: Dict[int, Dict[str, str]] = {
         1: {"name": "sunny", "description": "Sunny"},
         2: {"name": "mostly_sunny", "description": "Mostly Sunny"},
@@ -108,7 +102,7 @@ class WeatherIconHandler:
         44: {"name": "mostly_cloudy_with_snow_night", "description": "Mostly Cloudy with Snow (Night)"}
     }
 
-    def __init__(self):
+    def __init__(self) -> None:
         """
         Initializes the WeatherIconHandler.
 
@@ -121,8 +115,8 @@ class WeatherIconHandler:
             os.makedirs(self.icon_dir, exist_ok=True)
             logger.info(f"Icon directory set to: {self.icon_dir}")
         except OSError as e:
-            logger.error(f"Failed to create icon directory '{self.icon_dir}': {e}. Icons may fail to load or download.")
-            # Proceed, but loading/downloading might fail later.
+            logger.error(f"Failed to create icon directory '{self.icon_dir}': {e}. Icons may fail to load.")
+            # Proceed, but loading might fail later.
 
         # Initialize cache for loaded CTkImage objects to avoid redundant loading.
         self.icon_cache: Dict[str, ctk.CTkImage] = {}
@@ -132,17 +126,16 @@ class WeatherIconHandler:
         """
         Gets the absolute file path for a weather icon based on its code.
 
-        Handles unknown or None codes by defaulting to a sunny (day) or clear (night)
-        icon based on the current time. If the determined icon file does not exist
-        locally in `self.icon_dir`, it attempts to download it using `_download_icon`.
+        Handles unknown or None codes by defaulting to a sunny (day) or clear
+        (night) icon based on the current time. Icons are loaded only from the
+        bundled local asset directory.
 
         Args:
-            icon_code (Optional[int]): The numeric AccuWeather icon code (1-44), or None.
+            icon_code (Optional[int]): The numeric weather icon code (1-44), or None.
 
         Returns:
-            Optional[str]: The absolute path to the local icon file (.png) if it exists
-                           or was successfully downloaded. Returns None if the code is invalid
-                           (after defaulting) or if the download fails.
+            Optional[str]: The absolute path to the local icon file (.png) if it exists.
+                           Returns None if the file is missing.
         """
         original_code = icon_code # Store for logging purposes
 
@@ -171,23 +164,13 @@ class WeatherIconHandler:
         icon_path = os.path.join(self.icon_dir, filename)
         logger.debug(f"Determined icon path for code {icon_code}: {icon_path}")
 
-        # --- Check Existence and Download if Necessary ---
+        # --- Check Existence ---
         if not os.path.exists(icon_path):
-            logger.info(f"Icon file '{filename}' not found locally. Attempting download...")
-            # Call internal download method
-            if not self._download_icon(icon_code, icon_path):
-                # _download_icon logs specific errors
-                logger.error(f"Failed to obtain icon file for code {icon_code} at {icon_path}.")
-                return None # Return None if download failed
-
-        # --- Verify Existence After Potential Download ---
-        if os.path.exists(icon_path):
-            logger.debug(f"Icon file exists at: {icon_path}")
-            return icon_path
-        else:
-            # This case indicates an issue even after a reported successful download or logic error
-            logger.error(f"Icon path {icon_path} still does not exist after check/download attempt.")
+            logger.error(f"Icon file '{filename}' not found locally at {icon_path}.")
             return None
+
+        logger.debug(f"Icon file exists at: {icon_path}")
+        return icon_path
 
     def get_icon_by_condition(self, condition_text: Optional[str]) -> Optional[str]:
         """
@@ -205,7 +188,7 @@ class WeatherIconHandler:
 
         Returns:
             Optional[str]: The absolute path to the corresponding icon file if a match
-                           is found (using `get_icon_path` which handles defaults/downloads).
+                           is found (using `get_icon_path` which handles defaults).
                            Returns the path to a default icon if no match is found, or
                            None if the default icon process also fails.
         """
@@ -221,7 +204,7 @@ class WeatherIconHandler:
         for code, info in self.ICON_MAPPING.items():
             if info["description"].lower() == condition_lower:
                 logger.debug(f"Found exact description match for '{condition_text}': code {code}")
-                return self.get_icon_path(code) # Get path (handles download)
+                return self.get_icon_path(code)
 
         # --- Pass 2: Partial Match (Substring) ---
         # Be cautious with this, as it might lead to incorrect matches (e.g., "Cloudy" matching "Mostly Cloudy")
@@ -250,13 +233,13 @@ class WeatherIconHandler:
 
         Checks an internal cache (`self.icon_cache`) for an already loaded icon
         matching the code and size. If not found:
-        1. Gets the icon's file path using `get_icon_path` (handles defaults/downloads).
+        1. Gets the icon's file path using `get_icon_path` (handles defaults).
         2. Loads the image from the path using the `load_image` helper function.
         3. Caches the resulting `CTkImage` object.
         4. Returns the `CTkImage`.
 
         Args:
-            icon_code (Optional[int]): The numeric AccuWeather icon code (1-44), or None
+            icon_code (Optional[int]): The numeric weather icon code (1-44), or None
                                        (will trigger default icon logic).
             size (Tuple[int, int]): The desired (width, height) tuple for the icon image.
                                     Defaults to (64, 64).
@@ -264,8 +247,7 @@ class WeatherIconHandler:
         Returns:
             Optional[ctk.CTkImage]: A `CTkImage` object ready for display in a
                                     CustomTkinter widget, resized to the specified `size`.
-                                    Returns None if the icon cannot be found, downloaded,
-                                    or loaded due to errors.
+                                    Returns None if the icon cannot be found or loaded.
         """
         # Determine the effective code for caching (handles None/invalid input)
         effective_code = icon_code
@@ -285,9 +267,9 @@ class WeatherIconHandler:
             logger.debug(f"Returning cached CTkImage for key: {cache_key}")
             return self.icon_cache[cache_key]
 
-        # --- 2. Get Icon Path (Handles Downloads/Defaults) ---
+        # --- 2. Get Icon Path (Handles Defaults) ---
         logger.debug(f"Icon not in cache. Getting path for original code: {icon_code}")
-        icon_path = self.get_icon_path(icon_code) # Use original code here for correct path/download
+        icon_path = self.get_icon_path(icon_code)
         if not icon_path:
             # get_icon_path already logged the error
             logger.error(f"Failed to get icon path for code {icon_code}. Cannot load icon.")
@@ -315,118 +297,29 @@ class WeatherIconHandler:
             return None
 
 
-    def _download_icon(self, icon_code: int, save_path: str) -> bool:
+    def verify_all_icons(self) -> int:
         """
-        Internal helper method to download a specific AccuWeather icon image file.
+        Verifies local icons defined in `ICON_MAPPING`.
 
-        Constructs the official AccuWeather developer icon URL based on the numeric
-        code, downloads the image using `requests`, and saves it to the specified
-        local file path.
-
-        Args:
-            icon_code (int): The AccuWeather icon code (1-44).
-            save_path (str): The full local file path where the downloaded .png
-                             image should be saved.
+        The app is IMS-only and uses bundled local assets, so icon management
+        is a local packaging check rather than a network download step.
 
         Returns:
-            bool: True if the download and saving process is successful, False otherwise.
+            int: The number of expected icon files found locally.
         """
-        # Format icon code with leading zero if needed (e.g., 1 -> 01)
-        icon_str = f"{icon_code:02d}"
-        # Construct the expected AccuWeather icon URL (using '-s' for standard size)
-        icon_url = f"https://developer.accuweather.com/sites/default/files/{icon_str}-s.png"
-
-        logger.info(f"Attempting to download icon {icon_code} from {icon_url} to {save_path}")
-        try:
-            # Make the HTTP GET request, allow streaming for potentially larger files
-            response = requests.get(icon_url, stream=True, timeout=15) # 15-second timeout
-            response.raise_for_status() # Raise HTTPError for bad status codes (4xx or 5xx)
-
-            # Write the downloaded content to the specified file path
-            with open(save_path, 'wb') as f:
-                bytes_written = 0
-                for chunk in response.iter_content(chunk_size=8192): # Read/write in 8KB chunks
-                    f.write(chunk)
-                    bytes_written += len(chunk)
-            logger.info(f"Successfully downloaded icon {icon_code} ({bytes_written} bytes) to: {os.path.basename(save_path)}")
-            return True
-
-        except requests.exceptions.Timeout:
-             logger.error(f"Timeout occurred while downloading icon {icon_url}")
-             return False
-        except requests.exceptions.HTTPError as e:
-             logger.error(f"HTTP error downloading icon {icon_url}: {e.response.status_code} {e.response.reason}")
-             return False
-        except requests.exceptions.RequestException as e:
-            # Catch other network-related errors (ConnectionError, etc.)
-            logger.error(f"Network error downloading icon {icon_url}: {e}")
-            # Clean up potentially incomplete file if download failed
-            if os.path.exists(save_path):
-                self._try_remove_file(save_path)
-            return False
-        except IOError as e:
-             # Catch errors during file writing
-             logger.error(f"Failed to save downloaded icon to {save_path}: {e}")
-             if os.path.exists(save_path):
-                  self._try_remove_file(save_path)
-             return False
-        except Exception as e: # Catch any other unexpected errors
-            logger.error(f"An unexpected error occurred downloading icon {icon_url}: {e}", exc_info=True)
-            if os.path.exists(save_path):
-                 self._try_remove_file(save_path)
-            return False
-
-    def download_all_icons(self, force_download: bool = False) -> int:
-        """
-        Attempts to download all icons defined in `ICON_MAPPING`.
-
-        Iterates through all known icon codes. For each code, it constructs the
-        expected local path. If the file doesn't exist or if `force_download`
-        is True, it attempts to download the icon using `_download_icon`.
-
-        Args:
-            force_download (bool): If True, attempts to download icons even if
-                                   they already exist locally (overwriting them).
-                                   Defaults to False.
-
-        Returns:
-            int: The number of icons that were successfully downloaded (or overwritten)
-                 during this execution.
-        """
-        success_count = 0
-        action = "Downloading/Verifying" if not force_download else "Force Downloading"
-        logger.info(f"{action} all defined icons to directory: {self.icon_dir}...")
+        found_count = 0
+        logger.info(f"Verifying bundled icons in directory: {self.icon_dir}...")
 
         for icon_code, icon_info in self.ICON_MAPPING.items():
             filename = f"{icon_code:02d}_{icon_info['name']}.png"
             icon_path = os.path.join(self.icon_dir, filename)
-
-            # Download if forced or if the file doesn't exist
-            if force_download or not os.path.exists(icon_path):
-                if force_download:
-                     logger.debug(f"Force downloading icon {icon_code} ('{filename}')...")
-                else:
-                     logger.debug(f"Icon '{filename}' missing. Downloading...")
-
-                if self._download_icon(icon_code, icon_path):
-                    success_count += 1
-                else:
-                    # _download_icon logs specific errors
-                    logger.warning(f"Failed to download icon {icon_code} ('{filename}').")
+            if os.path.exists(icon_path):
+                found_count += 1
             else:
-                 logger.debug(f"Icon '{filename}' already exists. Skipping download.")
+                logger.warning(f"Bundled icon missing: {filename}")
 
-
-        logger.info(f"Finished icon download process. Successfully downloaded/verified {success_count} icons in this run.")
-        return success_count
-
-    def _try_remove_file(self, file_path: str):
-        """Internal helper to attempt removing a file, logging errors."""
-        try:
-            os.remove(file_path)
-            logger.debug(f"Removed potentially incomplete file: {file_path}")
-        except OSError as remove_error:
-            logger.error(f"Could not remove file {file_path} after error: {remove_error}")
+        logger.info(f"Finished icon verification. Found {found_count} bundled icons.")
+        return found_count
 
 # Example usage (if run directly)
 if __name__ == "__main__":
@@ -467,8 +360,8 @@ if __name__ == "__main__":
     # except Exception as e:
     #     print(f"Could not test load_icon directly: {e}")
 
-    print("\n--- Testing download_all_icons (will download missing) ---")
-    # downloaded_count = handler.download_all_icons(force_download=False)
-    # print(f"Downloaded {downloaded_count} new icons.")
+    print("\n--- Testing verify_all_icons ---")
+    # found_count = handler.verify_all_icons()
+    # print(f"Found {found_count} bundled icons.")
 
     print("\n--- Test Finished ---")

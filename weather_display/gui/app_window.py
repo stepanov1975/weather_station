@@ -11,7 +11,7 @@ Responsibilities:
 - Creating and arranging visual widgets within distinct regions:
     - Status Bar (Optional)
     - Time and Date Region
-    - Current Conditions Region (Temperature, Humidity, Air Quality - optional)
+    - Current Conditions Region (Temperature, Humidity)
     - Forecast Region (Multi-day forecast)
 - Applying fonts, colors, padding, margins, and corner radii from config.
 - Providing public methods (`update_time`, `update_date`, etc.) for data refresh.
@@ -19,12 +19,11 @@ Responsibilities:
 """
 
 import logging
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional
 import os
 from datetime import datetime # Added for timestamp formatting
 
 import customtkinter as ctk
-from PIL import Image
 
 # Local application imports
 # Use 'config' directly for accessing settings
@@ -32,16 +31,9 @@ from .. import config
 from ..utils.localization import (
     get_translation,
     translate_weather_condition,
-    translate_aqi_category
 )
 from ..utils.icon_handler import WeatherIconHandler
 from ..utils.helpers import get_day_name
-
-# Attempt to import ImageTk for type hinting
-try:
-    from PIL import ImageTk
-except ImportError:
-    ImageTk = None
 
 logger = logging.getLogger(__name__)
 
@@ -81,9 +73,6 @@ class AppWindow(ctk.CTk):
         humidity_frame (Optional[ctk.CTkFrame]): Sub-frame for humidity.
         humidity_title (Optional[ctk.CTkLabel]): "Humidity" label.
         humidity_value (Optional[ctk.CTkLabel]): Current humidity value.
-        air_quality_frame (Optional[ctk.CTkFrame]): Sub-frame for AQI.
-        air_quality_title (Optional[ctk.CTkLabel]): "Air Quality" label.
-        air_quality_value (Optional[ctk.CTkLabel]): Current AQI value/category.
         # --- Forecast Widgets ---
         forecast_day_frames (List[Dict[str, ctk.CTkLabel]]): List holding widgets
             for each forecast day (frame, day, icon, condition, temp labels).
@@ -261,10 +250,10 @@ class AppWindow(ctk.CTk):
             padx=config.ELEMENT_MARGINS['padx'],
             pady=config.ELEMENT_MARGINS['pady']
         )
-        # Configure internal grid for temp, humidity, aqi (e.g., 3 columns)
+        # Configure internal grid for temperature and optional humidity.
         num_current_cols = 1 # Start with temp
-        if config.OPTIONAL_ELEMENTS.get("show_current_humidity", True): num_current_cols += 1
-        if config.OPTIONAL_ELEMENTS.get("show_current_air_quality", True): num_current_cols += 1
+        if config.OPTIONAL_ELEMENTS.get("show_current_humidity", True):
+            num_current_cols += 1
         if num_current_cols > 0:
             self.current_conditions_frame.grid_columnconfigure(tuple(range(num_current_cols)), weight=1)
         self.current_conditions_frame.grid_rowconfigure(0, weight=1) # Single row expands
@@ -302,7 +291,8 @@ class AppWindow(ctk.CTk):
 
     def _create_status_bar(self):
         """Creates the status indicator labels in the status bar frame."""
-        if not self.status_bar_frame: return # Should not happen if called correctly
+        if not self.status_bar_frame:
+            return
         logger.debug("Creating status bar indicators...")
 
         indicator_font = self._get_font('status_indicator')
@@ -340,7 +330,6 @@ class AppWindow(ctk.CTk):
         region_padx = config.REGION_PADDING['padx']
         region_pady = config.REGION_PADDING['pady']
         element_padx = config.ELEMENT_PADDING['padx']
-        element_pady = config.ELEMENT_PADDING['pady']
         text_pady = config.TEXT_PADDING['pady']
 
         # --- Time Display ---
@@ -401,13 +390,11 @@ class AppWindow(ctk.CTk):
         logger.debug("Date display labels created.")
 
     def _create_current_conditions_region(self):
-        """Creates widgets for the current conditions (Temp, Humidity, AQI)."""
+        """Creates widgets for the current conditions."""
         logger.debug("Creating current conditions region widgets...")
         parent_frame = self.current_conditions_frame
         text_color = self._get_color('text')
         title_color = self._get_color('text_secondary', text_color) # Use secondary if available
-        region_padx = config.REGION_PADDING['padx']
-        region_pady = config.REGION_PADDING['pady']
         element_padx = config.ELEMENT_PADDING['padx']
         element_pady = config.ELEMENT_PADDING['pady']
         text_padx = config.TEXT_PADDING['padx']
@@ -483,52 +470,14 @@ class AppWindow(ctk.CTk):
         else:
             logger.debug("Humidity display is disabled in config.")
 
-        # --- Air Quality Sub-section (Optional) ---
-        self.air_quality_frame = None
-        self.air_quality_title = None
-        self.air_quality_value = None
-        if config.OPTIONAL_ELEMENTS.get("show_current_air_quality", True):
-            logger.debug("Creating air quality display...")
-            self.air_quality_frame = ctk.CTkFrame(
-                parent_frame,
-                corner_radius=frame_radius,
-                fg_color=frame_color
-            )
-            self.air_quality_frame.grid(
-                row=0, column=current_col, sticky="nsew",
-                padx=element_padx, pady=element_pady
-            )
-            self.air_quality_frame.grid_rowconfigure(0, weight=0) # Title
-            self.air_quality_frame.grid_rowconfigure(1, weight=1) # Value
-            self.air_quality_frame.grid_columnconfigure(0, weight=1) # Column
-
-            self.air_quality_title = ctk.CTkLabel(
-                self.air_quality_frame, text=get_translation('air_quality', config.LANGUAGE),
-                font=self._get_font('current_aqi_title'),
-                text_color=title_color
-            )
-            self.air_quality_title.grid(row=0, column=0, sticky="ew", padx=text_padx, pady=(text_pady*2, text_pady))
-
-            self.air_quality_value = ctk.CTkLabel(
-                self.air_quality_frame, text="--",
-                font=self._get_font('current_aqi_value'),
-                text_color=text_color
-            )
-            self.air_quality_value.grid(row=1, column=0, sticky="n", padx=element_padx, pady=element_pady)
-            current_col += 1
-        else:
-             logger.debug("Air quality display is disabled in config.")
-
         logger.debug("Current conditions region widgets created.")
 
 
-    def _create_forecast_region(self):
+    def _create_forecast_region(self) -> None:
         """Creates the frames and labels for the multi-day forecast region."""
         logger.debug("Creating forecast region widgets...")
         parent_frame = self.forecast_frame
         text_color = self._get_color('text')
-        region_padx = config.REGION_PADDING['padx']
-        region_pady = config.REGION_PADDING['pady']
         element_padx = config.ELEMENT_PADDING['padx']
         element_pady = config.ELEMENT_PADDING['pady']
         text_pady = config.TEXT_PADDING['pady']
@@ -657,7 +606,8 @@ class AppWindow(ctk.CTk):
         # Update Temperature (Always shown)
         temp = current_data.get('temperature')
         temp_text = f"{int(round(temp))}°C" if temp is not None else na_text
-        if self.temp_value: self.temp_value.configure(text=temp_text)
+        if self.temp_value:
+            self.temp_value.configure(text=temp_text)
         logger.debug(f"Temperature updated to: {temp_text}")
 
         # Update Humidity (If shown)
@@ -667,25 +617,13 @@ class AppWindow(ctk.CTk):
             self.humidity_value.configure(text=humidity_text)
             logger.debug(f"Humidity updated to: {humidity_text}")
 
-        # Update Air Quality (If shown)
-        if self.air_quality_value:
-            aqi_category = current_data.get('air_quality_category')
-            aqi_value = current_data.get('air_quality_index')
-            aqi_text = na_text
-            if aqi_category is not None:
-                translated_aqi = translate_aqi_category(aqi_category, config.LANGUAGE)
-                # aqi_text = f"{translated_aqi} ({aqi_value})" if aqi_value is not None else translated_aqi
-                aqi_text = translated_aqi # Keep it simple for now
-            self.air_quality_value.configure(text=aqi_text)
-            logger.debug(f"Air Quality updated to: {aqi_text}") # Corrected indentation
-
     def update_forecast(self, forecast_result: Dict[str, Any]):
         """
         Updates the multi-day forecast display section.
 
         Note: This method does NOT update the main status indicators itself.
         Status updates are handled by `update_current_weather` (for IMS) and
-        the AccuWeather update cycle in `main.py` which calls
+        the IMS forecast update cycle in `main.py` which calls
         `update_status_indicators` directly.
         """
         logger.debug(f"Updating forecast display. API Status: {forecast_result.get('api_status')}")
@@ -750,7 +688,7 @@ class AppWindow(ctk.CTk):
                                         ('ok', 'limit_reached', 'error', 'mock', 'offline', None).
                                         None might indicate an initial state or IMS-only update.
             last_success_time (Optional[float]): The timestamp (time.time()) of the
-                                                 last successful AccuWeather API call.
+                                                 last successful forecast API call.
                                                  None if no successful call yet or if the
                                                  update is only for IMS.
         """
@@ -795,15 +733,15 @@ class AppWindow(ctk.CTk):
         elif api_status == 'mock':
             api_text = "API: Mock" # No time needed for mock
             api_color = self._get_color("status_text") # Neutral color
-        elif api_status == 'offline': # This might be set by AccuWeatherClient if connection drops mid-fetch
+        elif api_status == 'offline':
              api_text = f"API: Offline ({success_time_str})"
              api_color = self._get_color("status_error_text")
         elif api_status is None and last_success_time is None:
              api_text = "API: Pending" # Initial state before first fetch
              api_color = self._get_color("status_text")
         elif api_status is None and last_success_time is not None:
-             # This case might occur if IMS update happens after a successful AccuWeather update
-             # Keep showing the last known AccuWeather status time
+             # This case might occur if the current observation update happens
+             # after a successful forecast update.
              api_text = f"API: OK ({success_time_str})" # Assume OK if time exists but status is None
              api_color = self._get_color("status_ok_text")
         else:

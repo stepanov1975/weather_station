@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Standalone script to verify downloaded AccuWeather weather icons.
+Standalone script to verify bundled weather icons.
 
 This script checks all icons expected according to the WeatherIconHandler mapping.
 It verifies if each file exists and attempts to open it using PIL to ensure
@@ -11,7 +11,6 @@ it's a valid image file. It reports missing or invalid icons.
 import os
 import sys
 import logging
-from typing import Tuple
 
 # Third-party imports
 from PIL import Image, UnidentifiedImageError
@@ -124,7 +123,6 @@ def main() -> int:
         return 1 # Indicate failure
 
     # --- Print Summary ---
-    total_checked = valid_icon_count + missing_icon_count + invalid_icon_count
     logger.info("-" * 30)
     logger.info("Icon Verification Summary:")
     logger.info(f"  Total Icons Expected: {len(WeatherIconHandler.ICON_MAPPING)}")
@@ -138,9 +136,9 @@ def main() -> int:
     else:
         logger.warning("Verification failed for one or more icons.")
         if missing_icon_count > 0:
-             logger.warning("Try running 'download_weather_icons.py' to fetch missing icons.")
+             logger.warning("Restore the missing bundled icons under weather_display/assets/weather_icons.")
         if invalid_icon_count > 0:
-             logger.warning("Invalid icons might need to be deleted and re-downloaded.")
+             logger.warning("Invalid icons should be replaced with valid bundled PNG assets.")
 
     return exit_code
 
