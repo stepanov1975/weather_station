@@ -29,3 +29,6 @@
 The app should be launched from the repository or installed package without any
 weather API key. Raspberry Pi boot must not fail just because the network is not
 ready yet.
+
+Logs are written outside the repository by default:
+`~/.local/state/weather_display/weather_display.log`.

@@ -1,5 +1,6 @@
 """Centralized configuration for the weather display application."""
 
+import os
 from pathlib import Path
 # ==============================================================================
 # Application Settings
@@ -8,7 +9,8 @@ from pathlib import Path
 APP_TITLE = "Weather Display"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-LOG_FILE_PATH = PROJECT_ROOT / "weather_display.log"
+USER_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+LOG_FILE_PATH = USER_STATE_DIR / "weather_display" / "weather_display.log"
 IMS_FORECAST_CACHE_PATH = PROJECT_ROOT / "forecast_cache.json"
 
 # Language code for UI text localization (e.g., 'en', 'he', 'ru').

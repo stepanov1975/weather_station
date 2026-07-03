@@ -107,7 +107,8 @@ Do not use `systemctl start weather-display.service` to preview GUI changes.
 
 ## Troubleshooting
 
-* Check `weather_display.log` for startup and data-fetch errors.
+* Check `~/.local/state/weather_display/weather_display.log` for startup and
+  data-fetch errors.
 * If the GUI fails, confirm the Pi booted into a desktop session and `DISPLAY`
   is set.
 * If current observations are missing, verify `IMS_STATION_NAME` matches a

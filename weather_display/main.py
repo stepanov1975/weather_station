@@ -82,6 +82,7 @@ root_logger.addHandler(stream_handler)
 
 # Rotating File Handler (rotates daily at midnight, keeps 7 backups)
 try:
+    config.LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
     file_handler = logging.handlers.TimedRotatingFileHandler(
         filename=str(config.LOG_FILE_PATH),
         when='midnight',        # Rotate at midnight
@@ -97,7 +98,7 @@ try:
 except (IOError, PermissionError, OSError) as e:
     # Log the error to the console handler if file handler setup fails
     # Use the root logger directly here as the module-level 'logger' might not be fully set up
-    root_logger.error(f"CRITICAL: Failed to initialize file logging to 'weather_display.log'. Error: {e}", exc_info=False)
+    root_logger.error(f"CRITICAL: Failed to initialize file logging to '{config.LOG_FILE_PATH}'. Error: {e}", exc_info=False)
     root_logger.error("Logging will proceed to console only.")
     log_file_success = False
 

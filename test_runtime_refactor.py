@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 import pytest
 
-from weather_display import main as main_module
+from weather_display import config, main as main_module
 from weather_display.main import WeatherDisplayApp
 from weather_display.services.ims_forecast import IMSCityForecast
 
@@ -38,6 +38,12 @@ class _FakeWindow:
         last_success_time: float | None,
     ) -> None:
         self.status_updates.append((connection_status, api_status, last_success_time))
+
+
+def test_default_log_file_is_outside_project_tree() -> None:
+    assert not config.LOG_FILE_PATH.is_relative_to(config.PROJECT_ROOT)
+    assert config.LOG_FILE_PATH.name == "weather_display.log"
+    assert config.LOG_FILE_PATH.parent.name == "weather_display"
 
 
 def test_signal_shutdown_runs_cleanup_even_when_signal_flips_running() -> None:
