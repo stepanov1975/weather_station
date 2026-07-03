@@ -43,6 +43,10 @@ class JsonCache:
             logger.warning("Ignoring unreadable cache file %s: %s", self.path, exc)
             return
 
+        if not isinstance(cache_data, dict):
+            logger.warning("Ignoring invalid cache file %s: expected JSON object", self.path)
+            return
+
         payload = cache_data.get("payload")
         timestamp = cache_data.get("timestamp")
         if isinstance(payload, dict) and isinstance(timestamp, (int, float)):
