@@ -641,7 +641,11 @@ class WeatherDisplayApp:
                 }
                 # Use after(0, ...) to schedule the update on the main Tkinter event loop
                 # Pass a copy of the payload to avoid potential race conditions if the dict is modified later
-                self.app_window.after(0, lambda payload=update_payload.copy(): self.app_window.update_current_weather(payload))
+                update_payload_snapshot = update_payload.copy()
+                self.app_window.after(
+                    0,
+                    lambda payload=update_payload_snapshot: self.app_window.update_current_weather(payload)
+                )
 
                 self.app_window.after(0, lambda conn=connection_status, api=api_status: self.app_window.update_status_indicators(conn, api, None)) # Pass None for last_success_time
 
@@ -706,7 +710,11 @@ class WeatherDisplayApp:
             )
 
             if self.app_window:
-                self.app_window.after(0, lambda res=forecast_result.copy(): self.app_window.update_forecast(res))
+                forecast_result_snapshot = forecast_result.copy()
+                self.app_window.after(
+                    0,
+                    lambda res=forecast_result_snapshot: self.app_window.update_forecast(res)
+                )
                 self.app_window.after(
                     0,
                     lambda conn=final_conn_status, api=final_api_status, success_time=self.last_forecast_success_time:

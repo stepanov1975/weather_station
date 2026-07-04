@@ -1,7 +1,28 @@
+[tool.pytest.ini_options]
+testpaths = ["."]
+python_files = ["test_*.py"]
+addopts = "-ra"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["F", "B"]
+
 [tool.mypy]
 python_version = "3.10"
 check_untyped_defs = true
+files = ["weather_display"]
 
 [[tool.mypy.overrides]]
 module = ["customtkinter", "pytz", "requests"]
 ignore_missing_imports = true
+
+[tool.coverage.run]
+source = ["weather_display"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
