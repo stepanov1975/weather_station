@@ -1,4 +1,4 @@
-customtkinter>=5.0.0
+customtkinter>=6.0.0
 pillow>=9.0.0
 pytz>=2026.2 # Added for IMS timezone handling
 requests>=2.34.2
