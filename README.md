@@ -29,6 +29,24 @@ source weather_venv/bin/activate
 pip install -r requirements.txt
 ```
 
+## Development
+
+Use the repository virtual environment for local checks:
+
+```bash
+./weather_venv/bin/python -m pytest
+./weather_venv/bin/python -m ruff check .
+./weather_venv/bin/python -m mypy weather_display
+```
+
+GitHub Actions runs the same checks on pushes to `main` and on pull requests.
+Dependabot is configured for Python dependencies and GitHub Actions.
+
+For repository security, the checked-in workflows run CodeQL, dependency
+review, and Gitleaks secret scanning. Also enable GitHub's native secret
+scanning and Dependabot alerts in the repository security settings when
+available.
+
 ## Configuration
 
 Edit `weather_display/config.py`:
