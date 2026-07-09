@@ -9,7 +9,12 @@ from pathlib import Path
 APP_TITLE = "Weather Display"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-USER_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
+_xdg_state_home = os.environ.get("XDG_STATE_HOME")
+USER_STATE_DIR = (
+    Path(_xdg_state_home)
+    if _xdg_state_home and Path(_xdg_state_home).is_absolute()
+    else Path.home() / ".local" / "state"
+)
 APP_STATE_DIR = USER_STATE_DIR / "weather_display"
 LOG_FILE_PATH = APP_STATE_DIR / "weather_display.log"
 IMS_FORECAST_CACHE_PATH = APP_STATE_DIR / "forecast_cache.json"

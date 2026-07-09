@@ -704,7 +704,7 @@ class WeatherDisplayApp:
         try:
             forecast_result = self.ims_forecast.get_forecast(force_refresh=force_refresh)
             forecast_api_status = forecast_result.get('api_status', 'error')
-            final_conn_status = bool(forecast_result.get('connection_status'))
+            final_conn_status = forecast_result.get('connection_status')
 
             if forecast_api_status == 'ok':
                 final_api_status = 'ok'

@@ -619,9 +619,8 @@ class AppWindow(ctk.CTk):
         Updates the multi-day forecast display section.
 
         Note: This method does NOT update the main status indicators itself.
-        Status updates are handled by `update_current_weather` (for IMS) and
-        the IMS forecast update cycle in `main.py` which calls
-        `update_status_indicators` directly.
+        The controller records each service's API status, combines the statuses,
+        and centrally schedules publication through `update_status_indicators`.
         """
         logger.debug(f"Updating forecast display. API Status: {forecast_result.get('api_status')}")
         # We don't update the main status bar from here, as it's handled centrally

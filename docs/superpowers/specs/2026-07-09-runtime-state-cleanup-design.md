@@ -61,7 +61,9 @@ Remove only confirmed leftovers identified in the review:
 - stale or redundant comments directly adjacent to changed code.
 
 The standalone IMS station-listing command, public forecast behavior, GUI
-layout, localization data, and broad module organization remain unchanged.
+layout, unrelated localization data, and broad module organization remain
+unchanged. Translations used only by functionality removed in this cleanup may
+be removed with that functionality.
 
 ## Error Handling
 

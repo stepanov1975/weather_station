@@ -1,6 +1,7 @@
 """Regression tests for runtime lifecycle and IMS forecast caching."""
 
 import json
+import logging
 import os
 import socket
 import subprocess
@@ -154,6 +155,25 @@ def test_forecast_cache_respects_xdg_state_home(tmp_path: Path) -> None:
 
     assert Path(result.stdout.strip()) == (
         tmp_path / "weather_display" / "forecast_cache.json"
+    )
+
+
+@pytest.mark.parametrize("xdg_state_home", ["", "relative-state"])
+def test_forecast_cache_rejects_invalid_xdg_state_home(xdg_state_home: str) -> None:
+    script = "from weather_display import config; print(config.IMS_FORECAST_CACHE_PATH)"
+    env = os.environ.copy()
+    env["XDG_STATE_HOME"] = xdg_state_home
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert Path(result.stdout.strip()) == (
+        Path.home() / ".local" / "state" / "weather_display" / "forecast_cache.json"
     )
 
 
@@ -361,6 +381,32 @@ def test_forecast_failure_does_not_overwrite_monitor_connectivity() -> None:
     app._update_forecast_data()
 
     assert app.last_connection_status is True
+
+
+def test_cached_forecast_logs_unknown_service_connectivity(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    app = _controller_for_status_tests()
+    app.app_window = None
+    app.ims_forecast = cast(
+        Any,
+        SimpleNamespace(
+            get_forecast=lambda force_refresh: {
+                "data": [],
+                "connection_status": None,
+                "api_status": "ok",
+                "cache_hit": True,
+            }
+        ),
+    )
+    app.headless = True
+
+    with caplog.at_level(logging.INFO, logger=main_module.logger.name):
+        app._update_forecast_data(force_refresh=False)
+
+    messages = [record.getMessage() for record in caplog.records]
+    assert "IMS forecast update status: API=ok, Connection=None, Forecast days=0" in messages
+    assert "  Overall Status: API=ok, Connection=None" in messages
 
 
 def _city_payload(date: str) -> dict[str, Any]:
