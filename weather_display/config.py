@@ -81,7 +81,6 @@ COLOR_THEME = {
     "status_text": ("white", "#FFFFFF", "#FFFFFF"), # Default/fallback status text color
     # Specific Status Text Colors (used by AppWindow.update_status_indicators)
     "status_ok_text": ("green", "#009688", "#4CAF50"),      # Greenish for OK
-    "status_warning_text": ("orange", "#FF9800", "#FFB300"), # Amber/Orange for Warning/Limit
     "status_error_text": ("red", "#F44336", "#E57373"),   # Reddish for Error/Offline
 }
 

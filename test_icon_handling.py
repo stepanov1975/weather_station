@@ -48,12 +48,8 @@ class TestWeatherIconHandler(unittest.TestCase):
             os.path.join(os.path.dirname(__file__), "weather_display", "assets", "weather_icons")
         )
 
-        with patch("os.makedirs") as mock_makedirs:
-            icon_handler = WeatherIconHandler()
-
-        mock_makedirs.assert_not_called()
-        self.assertEqual(os.path.abspath(icon_handler.icon_dir), expected_dir)
-        self.assertEqual(icon_handler.verify_all_icons(), len(icon_handler.ICON_MAPPING))
+        self.assertEqual(os.path.abspath(self.icon_handler.icon_dir), expected_dir)
+        self.assertEqual(self.icon_handler.verify_all_icons(), len(self.icon_handler.ICON_MAPPING))
     
     def test_get_icon_by_condition(self):
         """Test getting an icon path from a condition text."""

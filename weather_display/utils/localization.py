@@ -509,3 +509,4 @@ def get_day_name_localized(date_str: Optional[str], language: str = 'en') -> str
         # Log error if the date string cannot be parsed
         logger.error(f"Could not parse date string '{date_str}' to determine day name: {e}")
         return get_translation('unknown', language)
+

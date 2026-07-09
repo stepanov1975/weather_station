@@ -741,7 +741,7 @@ class AppWindow(ctk.CTk):
              api_text = f"API: {api_status} ({success_time_str})"
              api_color = self._get_color("status_text")
 
-        # TODO: Add localization for API status prefixes ("API: OK", "API: Limit", etc.)
+        # TODO: Add localization for API status prefixes.
         self.api_status_label.configure(text=api_text, text_color=api_color)
 
     def exit_fullscreen(self, event=None):
