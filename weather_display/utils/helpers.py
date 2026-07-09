@@ -50,23 +50,12 @@ def check_internet_connection(host: str = "8.8.8.8", port: int = 53, timeout: in
               False otherwise (indicating likely no internet connection or a firewall block).
     """
     try:
-        # Set a default timeout for socket operations
-        socket.setdefaulttimeout(timeout)
-        # Create a socket (AF_INET = IPv4, SOCK_STREAM = TCP)
-        # Use a 'with' statement for automatic socket closing
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
-            # Attempt to connect to the specified host and port
-            sock.connect((host, port))
-        # If connect succeeds without exception, connection is likely available
-        logger.debug(f"Internet connection check successful (connected to {host}:{port}).")
+        with socket.create_connection((host, port), timeout=timeout):
+            logger.debug("Internet connection check succeeded for %s:%s", host, port)
         return True
-    except (socket.error, socket.timeout) as e:
-        # Log the specific error encountered during the connection attempt
-        logger.debug(f"Internet connection check failed: Cannot connect to {host}:{port}. Error: {e}")
+    except (OSError, socket.timeout) as exc:
+        logger.debug("Internet connection check failed for %s:%s: %s", host, port, exc)
         return False
-    except Exception as e: # Catch any other unexpected socket errors
-         logger.error(f"Unexpected error during internet connection check: {e}", exc_info=True)
-         return False
 
 
 def load_image(path: str, size: Optional[Tuple[int, int]] = None) -> Optional[ctk.CTkImage]:

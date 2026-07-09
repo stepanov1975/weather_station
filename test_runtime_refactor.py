@@ -2,6 +2,7 @@
 
 import json
 import os
+import socket
 import subprocess
 import sys
 from pathlib import Path
@@ -14,6 +15,7 @@ import pytest
 from weather_display import config, main as main_module
 from weather_display.main import WeatherDisplayApp
 from weather_display.services.ims_forecast import IMSCityForecast
+from weather_display.utils.helpers import check_internet_connection
 
 
 class _FakeWindow:
@@ -61,6 +63,40 @@ def test_log_file_respects_xdg_state_home(tmp_path: Path) -> None:
     )
 
     assert Path(result.stdout.strip()) == tmp_path / "weather_display" / "weather_display.log"
+
+
+def test_importing_main_preserves_root_logging_configuration(tmp_path: Path) -> None:
+    script = """
+import logging
+marker = logging.NullHandler()
+root = logging.getLogger()
+root.handlers = [marker]
+import weather_display.main
+print(marker in root.handlers)
+"""
+    env = os.environ.copy()
+    env["XDG_STATE_HOME"] = str(tmp_path)
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert result.stdout.splitlines()[-1] == "True"
+    assert not (tmp_path / "weather_display" / "weather_display.log").exists()
+
+
+def test_connection_check_does_not_change_default_socket_timeout() -> None:
+    original_timeout = socket.getdefaulttimeout()
+
+    with patch("weather_display.utils.helpers.socket.create_connection") as connect:
+        assert check_internet_connection("example.test", 443, timeout=7)
+
+    connect.assert_called_once_with(("example.test", 443), timeout=7)
+    assert socket.getdefaulttimeout() == original_timeout
 
 
 def test_default_forecast_cache_is_outside_project_tree() -> None:
@@ -173,6 +209,7 @@ def test_main_starts_app_when_network_is_unavailable() -> None:
     args = SimpleNamespace(mock=False, windowed=False, headless=True)
 
     with (
+        patch.object(main_module, "configure_logging"),
         patch.object(main_module, "parse_arguments", return_value=args),
         patch.object(main_module.config, "USE_MOCK_DATA", False),
         patch.object(main_module, "check_internet_connection", return_value=False),

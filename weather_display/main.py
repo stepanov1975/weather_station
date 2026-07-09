@@ -64,51 +64,43 @@ except ImportError as e:
         sys.exit(1)
 
 
-# --- Global Logger Setup ---
-# Configure logging with console output and daily rotating file output.
-log_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-log_level = logging.INFO # Set the minimum logging level
-
-# Get the root logger
-root_logger = logging.getLogger()
-root_logger.setLevel(log_level)
-root_logger.handlers.clear() # Clear any default handlers (important if run multiple times)
-
-# Console Handler
-stream_handler = logging.StreamHandler()
-stream_handler.setFormatter(log_formatter)
-stream_handler.setLevel(log_level) # Set level for this handler
-root_logger.addHandler(stream_handler)
-
-# Rotating File Handler (rotates daily at midnight, keeps 7 backups)
-try:
-    config.LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    file_handler = logging.handlers.TimedRotatingFileHandler(
-        filename=str(config.LOG_FILE_PATH),
-        when='midnight',        # Rotate at midnight
-        interval=1,             # Rotate daily
-        backupCount=7,          # Keep 7 old log files
-        encoding='utf-8',       # Use UTF-8 encoding
-        delay=False             # Create log file immediately
-    )
-    file_handler.setFormatter(log_formatter)
-    file_handler.setLevel(log_level) # Set level for this handler
-    root_logger.addHandler(file_handler)
-    log_file_success = True
-except (IOError, PermissionError, OSError) as e:
-    # Log the error to the console handler if file handler setup fails
-    # Use the root logger directly here as the module-level 'logger' might not be fully set up
-    root_logger.error(f"CRITICAL: Failed to initialize file logging to '{config.LOG_FILE_PATH}'. Error: {e}", exc_info=False)
-    root_logger.error("Logging will proceed to console only.")
-    log_file_success = False
-
-# Get a logger instance specific to this module (__name__ resolves to 'weather_display.main')
-# This logger will inherit the handlers and level from the root logger.
+LOG_FORMAT = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+LOG_LEVEL = logging.INFO
 logger = logging.getLogger(__name__)
-if log_file_success:
-    logger.info("Logging configured with console and daily rotating file handler.")
-else:
-    logger.warning("Logging configured with console handler ONLY due to file handler initialization error.")
+
+
+def configure_logging() -> bool:
+    formatter = logging.Formatter(LOG_FORMAT)
+    root_logger = logging.getLogger()
+    root_logger.setLevel(LOG_LEVEL)
+    root_logger.handlers.clear()
+
+    stream_handler = logging.StreamHandler()
+    stream_handler.setFormatter(formatter)
+    stream_handler.setLevel(LOG_LEVEL)
+    root_logger.addHandler(stream_handler)
+
+    try:
+        config.LOG_FILE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.handlers.TimedRotatingFileHandler(
+            filename=str(config.LOG_FILE_PATH),
+            when="midnight",
+            interval=1,
+            backupCount=7,
+            encoding="utf-8",
+        )
+    except OSError as exc:
+        root_logger.error(
+            "Failed to initialize file logging to %s: %s",
+            config.LOG_FILE_PATH,
+            exc,
+        )
+        return False
+
+    file_handler.setFormatter(formatter)
+    file_handler.setLevel(LOG_LEVEL)
+    root_logger.addHandler(file_handler)
+    return True
 
 
 class WeatherDisplayApp:
@@ -812,6 +804,7 @@ def main() -> None:
        during runtime, attempting graceful shutdown via `app.stop()`.
     7. Ensures `app.stop()` is called in a `finally` block for cleanup.
     """
+    configure_logging()
     args = parse_arguments()
     logger.info("Weather Display Application starting...")
 
