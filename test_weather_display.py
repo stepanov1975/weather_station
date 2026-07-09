@@ -25,13 +25,7 @@ class TestWeatherDisplay(unittest.TestCase):
         client = IMSCityForecast(location_id=18)
 
         with patch("weather_display.config.USE_MOCK_DATA", True):
-            current_weather = client.get_current_weather()
             forecast = client.get_forecast(days=3)
-
-        self.assertEqual(current_weather["api_status"], "mock")
-        self.assertIn('temperature', current_weather["data"])
-        self.assertIn('humidity', current_weather["data"])
-        self.assertIn('condition', current_weather["data"])
 
         self.assertEqual(forecast["api_status"], "mock")
         self.assertEqual(len(forecast["data"]), 3)

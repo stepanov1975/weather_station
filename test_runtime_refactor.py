@@ -371,7 +371,6 @@ def _city_payload(date: str) -> dict[str, Any]:
                 "temperature": "26",
                 "relative_humidity": "70",
                 "weather_code": "1230",
-                "forecast_time": f"{date} 12:00:00",
             },
             "weather_codes": {
                 "1230": {"desc_en": "Cloudy", "desc": "Cloudy"},

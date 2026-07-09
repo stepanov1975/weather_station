@@ -22,9 +22,7 @@ from typing import Dict, Optional, Tuple
 # Third-party imports
 import customtkinter as ctk # For the CTkImage object used in the GUI
 
-# Local application imports
-# No direct config needed, but relies on helpers for loading
-# from ..utils.helpers import load_image # Import moved inside method to avoid circular dependency if helpers imports this
+from .helpers import load_image
 
 # Get a logger instance specific to this module
 logger = logging.getLogger(__name__)
@@ -106,21 +104,12 @@ class WeatherIconHandler:
         """
         Initializes the WeatherIconHandler.
 
-        Sets the icon directory path and ensures it exists. Initializes an empty
-        dictionary to cache loaded `CTkImage` objects.
+        Sets the icon directory path and initializes an empty dictionary to
+        cache loaded `CTkImage` objects.
         """
-        self.icon_dir: str = self._ICON_BASE_DIR
-        # Ensure the icon directory exists, creating it if necessary.
-        try:
-            os.makedirs(self.icon_dir, exist_ok=True)
-            logger.info(f"Icon directory set to: {self.icon_dir}")
-        except OSError as e:
-            logger.error(f"Failed to create icon directory '{self.icon_dir}': {e}. Icons may fail to load.")
-            # Proceed, but loading might fail later.
-
-        # Initialize cache for loaded CTkImage objects to avoid redundant loading.
+        self.icon_dir = self._ICON_BASE_DIR
         self.icon_cache: Dict[str, ctk.CTkImage] = {}
-        logger.debug("Initialized empty icon cache.")
+        logger.info("Icon directory set to: %s", self.icon_dir)
 
     def get_icon_path(self, icon_code: Optional[int]) -> Optional[str]:
         """
@@ -276,15 +265,8 @@ class WeatherIconHandler:
             return None
 
         # --- 3. Load Image using Helper ---
-        # Import dynamically to potentially avoid circular dependency if helpers imports this module
-        try:
-            from ..utils.helpers import load_image as load_image_helper
-        except ImportError:
-             logger.critical("CRITICAL: Could not import load_image from weather_display.utils.helpers. Cannot load icons.")
-             return None
-
         logger.debug(f"Loading image from path '{icon_path}' with size {size}...")
-        icon_image: Optional[ctk.CTkImage] = load_image_helper(icon_path, size=size)
+        icon_image = load_image(icon_path, size=size)
 
         # --- 4. Cache and Return ---
         if icon_image:
@@ -292,7 +274,7 @@ class WeatherIconHandler:
             self.icon_cache[cache_key] = icon_image # Add to cache
             return icon_image
         else:
-            # load_image_helper should have logged the error
+            # load_image should have logged the error
             logger.error(f"Failed to load CTkImage from path: {icon_path}")
             return None
 

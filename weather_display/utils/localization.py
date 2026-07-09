@@ -55,7 +55,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'day': 'Day', # Generic 'Day' label
         'unknown': 'Unknown', # General unknown value fallback
         'no_internet': 'No Internet Connection',
-        'api_limit_reached': 'API Limit Reached',
         'api_error': 'API Error', # General API error status
 
         # Day Names (Full) - Used by date formatting functions
@@ -139,7 +138,6 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'day': 'День',
         'unknown': 'Неизвестно',
         'no_internet': 'Нет подключения к Интернету',
-        'api_limit_reached': 'Достигнут лимит API',
         'api_error': 'Ошибка API',
 
         # Day Names (Full)
@@ -511,4 +509,3 @@ def get_day_name_localized(date_str: Optional[str], language: str = 'en') -> str
         # Log error if the date string cannot be parsed
         logger.error(f"Could not parse date string '{date_str}' to determine day name: {e}")
         return get_translation('unknown', language)
-

@@ -4,7 +4,6 @@ General Utility Helper Functions for the Weather Display Application.
 This module provides common utility functions used across the application:
 - Checking for internet connectivity (`check_internet_connection`).
 - Loading images for use with CustomTkinter (`load_image`).
-- Formatting values for display.
 - Wrapping localization functions for convenience (`get_day_name`).
 
 Keeping these utilities separate promotes code reuse and maintainability.
@@ -14,7 +13,7 @@ Keeping these utilities separate promotes code reuse and maintainability.
 import os
 import logging
 import socket
-from typing import Optional, Tuple, Union
+from typing import Optional, Tuple
 
 from PIL import Image # For image loading/processing
 import customtkinter as ctk # For CTkImage type
@@ -112,34 +111,6 @@ def load_image(path: str, size: Optional[Tuple[int, int]] = None) -> Optional[ct
         # Catch potential errors from PIL (e.g., corrupted file) or CTkImage creation
         logger.error(f"Failed to load or process image {path}: {e}", exc_info=True)
         return None
-
-
-# --- Formatting Functions ---
-
-def format_temperature(temp: Optional[Union[float, int]]) -> str:
-    """
-    Formats a temperature value (assumed Celsius) into a display string.
-
-    Rounds the temperature to the nearest integer and appends the degree symbol
-    and "C". Handles None input by returning a localized "Not Available" string.
-
-    Args:
-        temp (Optional[Union[float, int]]): The temperature value in Celsius,
-                                             or None if the value is unavailable.
-
-    Returns:
-        str: A formatted temperature string like "23°C", or a localized "N/A"
-             string if the input `temp` is None.
-    """
-    if temp is None:
-        # Use the localization utility to get the appropriate "N/A" text
-        return get_translation('not_available', config.LANGUAGE)
-    try:
-        # Round the temperature to the nearest integer and format
-        return f"{int(round(float(temp)))}°C"
-    except (ValueError, TypeError) as e:
-         logger.warning(f"Could not format temperature value '{temp}': {e}")
-         return get_translation('not_available', config.LANGUAGE)
 
 
 # --- Localization Wrappers ---

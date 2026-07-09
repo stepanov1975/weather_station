@@ -1,9 +1,9 @@
 """
 IMS city portal forecast service.
 
-The IMS city portal endpoint returns JSON for a city, including current forecast
-analysis and daily forecasts. This service normalizes that payload into the
-small dictionaries consumed by the existing weather display GUI.
+The IMS city portal endpoint returns JSON for a city, including daily forecasts.
+This service normalizes that payload into the small dictionaries consumed by
+the existing weather display GUI.
 """
 
 import logging
@@ -13,7 +13,7 @@ from typing import Any
 import requests
 
 from .. import config
-from ..models import CurrentWeather, ForecastDay
+from ..models import ForecastDay
 from .json_cache import JsonCache
 
 logger = logging.getLogger(__name__)
@@ -105,15 +105,6 @@ class IMSCityForecast:
                 "cache_hit": fallback is not None,
             }
 
-    def get_current_weather(self, force_refresh: bool = False) -> dict[str, Any]:
-        payload_result = self.fetch_payload(force_refresh=force_refresh)
-        return {
-            "data": self.parse_current_weather(payload_result["data"]),
-            "connection_status": payload_result["connection_status"],
-            "api_status": payload_result["api_status"],
-            "cache_hit": payload_result["cache_hit"],
-        }
-
     def get_forecast(self, days: int = 3, force_refresh: bool = False) -> dict[str, Any]:
         payload_result = self.fetch_payload(force_refresh=force_refresh)
         return {
@@ -122,18 +113,6 @@ class IMSCityForecast:
             "api_status": payload_result["api_status"],
             "cache_hit": payload_result["cache_hit"],
         }
-
-    def parse_current_weather(self, payload: dict[str, Any]) -> dict[str, Any]:
-        data = payload.get("data", {})
-        analysis = data.get("analysis", {})
-        condition = self._condition_from_code(data, analysis.get("weather_code"))
-        return CurrentWeather(
-            temperature=self._to_float(analysis.get("temperature")),
-            humidity=self._to_int(analysis.get("relative_humidity")),
-            condition=condition,
-            icon_code=self._icon_code_for_condition(condition),
-            forecast_time=analysis.get("forecast_time"),
-        ).to_dict()
 
     def parse_forecast(self, payload: dict[str, Any], days: int = 3) -> list[dict[str, Any]]:
         data = payload.get("data", {})
@@ -194,7 +173,6 @@ class IMSCityForecast:
                     "temperature": "26",
                     "relative_humidity": "70",
                     "weather_code": "1230",
-                    "forecast_time": "2026-07-03 12:00:00",
                 },
                 "weather_codes": {
                     "1230": {"desc_en": "Cloudy", "desc": "Cloudy"},
@@ -237,12 +215,5 @@ class IMSCityForecast:
     def _to_float(value: Any) -> float | None:
         try:
             return float(value)
-        except (TypeError, ValueError):
-            return None
-
-    @staticmethod
-    def _to_int(value: Any) -> int | None:
-        try:
-            return int(float(value))
         except (TypeError, ValueError):
             return None

@@ -78,10 +78,6 @@ COLOR_THEME = {
     "text": ("black", "#101010", "#DCE4EE"), # Default text color
     "text_secondary": ("gray", "#606060", "#A0A0A0"), # Less prominent text
     "accent": ("blue", "#3B8ED0", "#1F6AA5"), # Accent color for highlights
-    # Status Indicator Colors (overriding specific values below if needed)
-    "status_no_connection_bg": ("red", "#FF5555", "#C04040"),
-    "status_api_limit_bg": ("orange", "#FFA500", "#D08000"),
-    "status_api_error_bg": ("red", "#FF0000", "#A00000"),
     "status_text": ("white", "#FFFFFF", "#FFFFFF"), # Default/fallback status text color
     # Specific Status Text Colors (used by AppWindow.update_status_indicators)
     "status_ok_text": ("green", "#009688", "#4CAF50"),      # Greenish for OK
@@ -91,11 +87,6 @@ COLOR_THEME = {
 
 # Select the active color palette based on DARK_MODE
 ACTIVE_COLORS = {name: colors[2] if DARK_MODE else colors[1] for name, colors in COLOR_THEME.items()}
-
-# Set the default CTk color theme based on the primary color choice
-# Note: This sets the base theme; specific widget colors can still be overridden using ACTIVE_COLORS
-ctk_theme_name = COLOR_THEME["primary"][0] # e.g., "blue"
-# CTK_DEFAULT_COLOR_THEME = "blue" # Keep this simple for now, advanced theming can be complex
 
 # --- Layout Structure ---
 # Defines the relative height proportions of the main UI regions.

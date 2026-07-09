@@ -15,7 +15,6 @@ class TestIMSCityForecast(unittest.TestCase):
                     "temperature": "26.4",
                     "relative_humidity": "76",
                     "weather_code": "1230",
-                    "forecast_time": "2026-07-03 20:20:00",
                 },
                 "weather_codes": {
                     "1230": {"desc_en": "Cloudy", "desc": "Cloudy"},
@@ -43,12 +42,8 @@ class TestIMSCityForecast(unittest.TestCase):
         }
 
         client = IMSCityForecast(location_id=18)
-        current = client.parse_current_weather(payload)
         forecast = client.parse_forecast(payload, days=2)
 
-        self.assertEqual(current["temperature"], 26.4)
-        self.assertEqual(current["humidity"], 76)
-        self.assertEqual(current["condition"], "Cloudy")
         self.assertEqual(forecast[0]["date"], "2026-07-03")
         self.assertEqual(forecast[0]["max_temp"], 30.0)
         self.assertEqual(forecast[0]["min_temp"], 23.0)

@@ -40,9 +40,6 @@ logger = logging.getLogger(__name__)
 # --- Global UI Setup (Theme and Appearance) ---
 # Set appearance mode based on config *before* AppWindow instantiation
 ctk.set_appearance_mode("dark" if config.DARK_MODE else "light")
-# Note: Default color theme ('blue', 'green', etc.) can be set globally,
-# but we'll primarily rely on ACTIVE_COLORS for specific widget styling.
-# ctk.set_default_color_theme(config.ctk_theme_name) # Optional: sets the base theme
 
 
 class AppWindow(ctk.CTk):
@@ -685,7 +682,7 @@ class AppWindow(ctk.CTk):
         Args:
             connection_status (bool): The current internet connection status.
             api_status (Optional[str]): The status of the last relevant API call
-                                        ('ok', 'limit_reached', 'error', 'mock', 'offline', None).
+                                        ('ok', 'error', 'mock', 'offline', None).
                                         None might indicate an initial state or IMS-only update.
             last_success_time (Optional[float]): The timestamp (time.time()) of the
                                                  last successful forecast API call.
@@ -724,9 +721,6 @@ class AppWindow(ctk.CTk):
             time_suffix = f" ({success_time_str})" if last_success_time else ""
             api_text = f"API: OK{time_suffix}"
             api_color = self._get_color("status_ok_text")
-        elif api_status == 'limit_reached':
-            api_text = f"API: Limit ({success_time_str})"
-            api_color = self._get_color("status_warning_text") # Use a warning color
         elif api_status == 'error':
             api_text = f"API: Error ({success_time_str})"
             api_color = self._get_color("status_error_text")
@@ -740,8 +734,6 @@ class AppWindow(ctk.CTk):
              api_text = "API: Pending" # Initial state before first fetch
              api_color = self._get_color("status_text")
         elif api_status is None and last_success_time is not None:
-             # This case might occur if the current observation update happens
-             # after a successful forecast update.
              api_text = f"API: OK ({success_time_str})" # Assume OK if time exists but status is None
              api_color = self._get_color("status_ok_text")
         else:
@@ -764,10 +756,3 @@ class AppWindow(ctk.CTk):
             logger.info("Exited fullscreen mode successfully.")
         except Exception as e:
             logger.error(f"Error encountered while exiting fullscreen mode: {e}")
-
-# --- Color Configuration (Placeholder - Define these in config.py) ---
-# Add placeholder color keys to config.ACTIVE_COLORS if they don't exist
-# Example additions to config.py's COLOR_THEME dictionaries:
-# 'status_ok_text': ('#00C853', '#4CAF50'),      # Greenish for OK
-# 'status_warning_text': ('#FFAB00', '#FFB300'), # Amber/Orange for Warning/Limit
-# 'status_error_text': ('#D50000', '#F44336'),   # Reddish for Error/Offline
