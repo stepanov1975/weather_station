@@ -5,6 +5,7 @@ import os
 import socket
 import subprocess
 import sys
+import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -27,8 +28,9 @@ class _FakeWindow:
     def after_cancel(self, job_id: str) -> None:
         self.cancelled.append(job_id)
 
-    def after(self, _delay: int, callback: Any) -> None:
+    def after(self, _delay: int, callback: Any) -> str:
         callback()
+        return "job-id"
 
     def winfo_exists(self) -> bool:
         return True
@@ -43,6 +45,17 @@ class _FakeWindow:
         last_success_time: float | None,
     ) -> None:
         self.status_updates.append((connection_status, api_status, last_success_time))
+
+
+def _controller_for_status_tests() -> WeatherDisplayApp:
+    app = object.__new__(WeatherDisplayApp)
+    app.app_window = cast(Any, _FakeWindow())
+    app.last_connection_status = True
+    app.last_forecast_success_time = 123.0
+    app._current_api_status = None
+    app._forecast_api_status = None
+    app._status_lock = threading.Lock()
+    return app
 
 
 def test_default_log_file_is_outside_project_tree() -> None:
@@ -249,17 +262,63 @@ def test_headless_start_fetches_initial_data_before_sleeping() -> None:
 
 
 def test_weather_update_exception_updates_status_with_required_arguments() -> None:
-    app = object.__new__(WeatherDisplayApp)
-    app.ims_weather = cast(Any, SimpleNamespace(fetch_data=lambda: (_ for _ in ()).throw(RuntimeError("boom"))))
-    fake_window = _FakeWindow()
-    app.app_window = cast(Any, fake_window)
+    app = _controller_for_status_tests()
+    app.ims_weather = cast(
+        Any,
+        SimpleNamespace(
+            fetch_data=lambda: (_ for _ in ()).throw(RuntimeError("boom"))
+        ),
+    )
+    fake_window = cast(_FakeWindow, app.app_window)
     app.headless = False
-    app.last_connection_status = True
 
     app._update_weather()
 
-    assert fake_window.status_updates == [(False, "error", None)]
-    assert app.last_connection_status is False
+    assert fake_window.status_updates == [(True, "error", 123.0)]
+    assert app.last_connection_status is True
+
+
+def test_current_success_does_not_hide_forecast_failure() -> None:
+    app = _controller_for_status_tests()
+
+    app._record_api_status("forecast", "offline")
+    app._record_api_status("current", "ok")
+    app._schedule_status_update()
+
+    window = cast(_FakeWindow, app.app_window)
+    assert window.status_updates[-1] == (True, "offline", 123.0)
+
+
+def test_weather_failure_does_not_overwrite_monitor_connectivity() -> None:
+    app = _controller_for_status_tests()
+    app.app_window = None
+    app.ims_weather = cast(Any, SimpleNamespace(fetch_data=lambda: False))
+    app.headless = True
+
+    app._update_weather()
+
+    assert app.last_connection_status is True
+
+
+def test_forecast_failure_does_not_overwrite_monitor_connectivity() -> None:
+    app = _controller_for_status_tests()
+    app.app_window = None
+    app.ims_forecast = cast(
+        Any,
+        SimpleNamespace(
+            get_forecast=lambda force_refresh: {
+                "data": [],
+                "connection_status": False,
+                "api_status": "offline",
+                "cache_hit": True,
+            }
+        ),
+    )
+    app.headless = True
+
+    app._update_forecast_data()
+
+    assert app.last_connection_status is True
 
 
 def _city_payload(date: str) -> dict[str, Any]:

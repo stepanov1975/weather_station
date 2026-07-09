@@ -147,6 +147,9 @@ class WeatherDisplayApp:
         self._update_threads: list[threading.Thread] = []
         self._time_update_job_id: Optional[str] = None # For cancelling Tkinter 'after' job
         self._stop_lock = threading.Lock()
+        self._status_lock = threading.Lock()
+        self._current_api_status: str | None = None
+        self._forecast_api_status: str | None = None
 
         logger.info("Initializing application components...")
 
@@ -510,6 +513,7 @@ class WeatherDisplayApp:
                          logger.debug(log_msg + " (GUI indicators will reflect this)")
                      # Update the tracked status
                      self.last_connection_status = current_status
+                     self._schedule_status_update()
                 else:
                      logger.debug(f"Connection status remains: {'Connected' if current_status else 'Disconnected'}")
 
@@ -526,6 +530,36 @@ class WeatherDisplayApp:
         logger.debug("Connection monitoring loop finished.")
 
     # --- Data Update Actions ---
+
+    def _record_api_status(self, source: str, status: str | None) -> None:
+        if source not in {"current", "forecast"}:
+            raise ValueError(f"Unknown API status source: {source}")
+        with self._status_lock:
+            if source == "current":
+                self._current_api_status = status
+            else:
+                self._forecast_api_status = status
+
+    def _combined_api_status(self) -> str | None:
+        priority = {None: 0, "ok": 1, "mock": 2, "offline": 3, "error": 4}
+        with self._status_lock:
+            statuses = (self._current_api_status, self._forecast_api_status)
+        return max(statuses, key=lambda status: priority.get(status, 4))
+
+    def _schedule_status_update(self) -> None:
+        if not self.app_window:
+            return
+        connection_status = self.last_connection_status
+        api_status = self._combined_api_status()
+        success_time = self.last_forecast_success_time
+        self.app_window.after(
+            0,
+            lambda: self.app_window.update_status_indicators(
+                connection_status,
+                api_status,
+                success_time,
+            ),
+        )
 
     def _update_time_and_date(self):
         """
@@ -639,8 +673,6 @@ class WeatherDisplayApp:
                     lambda payload=update_payload_snapshot: self.app_window.update_current_weather(payload)
                 )
 
-                self.app_window.after(0, lambda conn=connection_status, api=api_status: self.app_window.update_status_indicators(conn, api, None)) # Pass None for last_success_time
-
             elif self.headless:
                  # Log fetched data details clearly in headless mode
                  logger.info("Headless Weather Update (IMS):")
@@ -648,23 +680,15 @@ class WeatherDisplayApp:
                  logger.info(f"  Connection Status during fetch: {connection_status}")
                  logger.info(f"  API Status: {api_status}")
 
-            # Update the application's overall connection status tracker if it changed
-            if self.last_connection_status != connection_status:
-                 logger.debug(f"Overall connection status updated based on IMS fetch: {'Connected' if connection_status else 'Disconnected'}")
-                 self.last_connection_status = connection_status
+            self._record_api_status("current", api_status)
+            self._schedule_status_update()
 
             logger.info("IMS weather data update cycle finished.")
 
         except Exception as e:
             logger.error(f"Unexpected error during IMS weather update cycle: {e}", exc_info=True)
-            # Attempt to update status indicators in GUI to show error state
-            if self.app_window:
-                # Schedule an update to show error status (assuming connection failed or other error)
-                self.app_window.after(0, lambda: self.app_window.update_status_indicators(False, 'error', None))
-            # Update internal connection status tracker if an error implies disconnection
-            if self.last_connection_status:
-                 logger.warning("Connection status likely changed to Disconnected due to IMS update error.")
-                 self.last_connection_status = False
+            self._record_api_status("current", "error")
+            self._schedule_status_update()
 
     def _update_forecast_data(self, force_refresh: bool = True):
         """
@@ -707,34 +731,18 @@ class WeatherDisplayApp:
                     0,
                     lambda res=forecast_result_snapshot: self.app_window.update_forecast(res)
                 )
-                self.app_window.after(
-                    0,
-                    lambda conn=final_conn_status, api=final_api_status, success_time=self.last_forecast_success_time:
-                    self.app_window.update_status_indicators(conn, api, success_time)
-                )
             elif self.headless:
                 logger.info("Headless IMS Forecast Update:")
                 logger.info(f"  Forecast Data Count: {len(forecast_result.get('data', []))}")
                 logger.info(f"  Overall Status: API={final_api_status}, Connection={final_conn_status}")
 
-            if self.last_connection_status != final_conn_status:
-                logger.debug(
-                    "Overall connection status updated based on IMS forecast fetch: %s",
-                    'Connected' if final_conn_status else 'Disconnected'
-                )
-                self.last_connection_status = final_conn_status
+            self._record_api_status("forecast", final_api_status)
+            self._schedule_status_update()
 
         except Exception as e:
             logger.error(f"Unexpected error during IMS forecast update cycle: {e}", exc_info=True)
-            if self.app_window:
-                self.app_window.after(
-                    0,
-                    lambda success_time=self.last_forecast_success_time:
-                    self.app_window.update_status_indicators(False, 'error', success_time)
-                )
-            if self.last_connection_status:
-                logger.warning("Connection status likely changed to Disconnected due to IMS forecast update error.")
-                self.last_connection_status = False
+            self._record_api_status("forecast", "error")
+            self._schedule_status_update()
 
         logger.info("IMS forecast data update cycle finished.")
 
