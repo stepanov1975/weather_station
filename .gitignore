@@ -44,8 +44,9 @@ venv/
 ENV/
 env.bak/
 venv.bak/
-weather_venv/
+weather_venv
 .worktrees/
+.superpowers/
 
 # IDE
 .idea/
