@@ -1,6 +1,7 @@
 """Regression tests for runtime lifecycle and IMS forecast caching."""
 
 import json
+import os
 import subprocess
 import sys
 from pathlib import Path
@@ -62,6 +63,30 @@ def test_log_file_respects_xdg_state_home(tmp_path: Path) -> None:
     assert Path(result.stdout.strip()) == tmp_path / "weather_display" / "weather_display.log"
 
 
+def test_default_forecast_cache_is_outside_project_tree() -> None:
+    assert not config.IMS_FORECAST_CACHE_PATH.is_relative_to(config.PROJECT_ROOT)
+    assert config.IMS_FORECAST_CACHE_PATH.name == "forecast_cache.json"
+    assert config.IMS_FORECAST_CACHE_PATH.parent.name == "weather_display"
+
+
+def test_forecast_cache_respects_xdg_state_home(tmp_path: Path) -> None:
+    script = "from weather_display import config; print(config.IMS_FORECAST_CACHE_PATH)"
+    env = os.environ.copy()
+    env["XDG_STATE_HOME"] = str(tmp_path)
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        check=True,
+        capture_output=True,
+        env=env,
+        text=True,
+    )
+
+    assert Path(result.stdout.strip()) == (
+        tmp_path / "weather_display" / "forecast_cache.json"
+    )
+
+
 def test_signal_shutdown_runs_cleanup_even_when_signal_flips_running() -> None:
     app = object.__new__(WeatherDisplayApp)
     app.running = True
@@ -115,7 +140,7 @@ def test_valid_forecast_cache_does_not_report_fresh_startup_offline(tmp_path: Pa
 
     assert result["cache_hit"] is True
     assert result["api_status"] == "ok"
-    assert result["connection_status"] is True
+    assert result["connection_status"] is None
 
 
 def test_forecast_fetch_reports_ok_when_cache_write_fails(tmp_path: Path) -> None:

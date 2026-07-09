@@ -52,11 +52,11 @@ class IMSCityForecast:
         self.timeout_seconds = timeout_seconds
         self.url = self.BASE_URL.format(location_id=location_id)
         self.cache = JsonCache(cache_path or config.IMS_FORECAST_CACHE_PATH)
-        self._connection_status = False
+        self._connection_status: bool | None = False
         logger.info("IMSCityForecast initialized for location id %s", location_id)
 
     @property
-    def connection_status(self) -> bool:
+    def connection_status(self) -> bool | None:
         return self._connection_status
 
     def fetch_payload(self, force_refresh: bool = False) -> dict[str, Any]:
@@ -73,10 +73,10 @@ class IMSCityForecast:
 
         if not force_refresh and self.cache.is_valid(cache_duration):
             logger.info("Using cached IMS city forecast payload.")
-            self._connection_status = True
+            self._connection_status = None
             return {
                 "data": self.cache.payload,
-                "connection_status": True,
+                "connection_status": None,
                 "api_status": "ok",
                 "cache_hit": True,
             }

@@ -10,8 +10,9 @@ APP_TITLE = "Weather Display"
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 USER_STATE_DIR = Path(os.environ.get("XDG_STATE_HOME", Path.home() / ".local" / "state"))
-LOG_FILE_PATH = USER_STATE_DIR / "weather_display" / "weather_display.log"
-IMS_FORECAST_CACHE_PATH = PROJECT_ROOT / "forecast_cache.json"
+APP_STATE_DIR = USER_STATE_DIR / "weather_display"
+LOG_FILE_PATH = APP_STATE_DIR / "weather_display.log"
+IMS_FORECAST_CACHE_PATH = APP_STATE_DIR / "forecast_cache.json"
 
 # Language code for UI text localization (e.g., 'en', 'he', 'ru').
 # Affects translations provided by the localization utility.
