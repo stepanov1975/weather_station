@@ -47,6 +47,27 @@ class _FakeWindow:
         self.status_updates.append((connection_status, api_status, last_success_time))
 
 
+class _DeferredWindow(_FakeWindow):
+    def __init__(self) -> None:
+        super().__init__()
+        self.callbacks: list[Any] = []
+        self.first_callback_waiting = threading.Event()
+        self.release_first_callback = threading.Event()
+        self._after_calls = 0
+
+    def after(self, _delay: int, callback: Any) -> str:
+        self._after_calls += 1
+        if self._after_calls == 1:
+            self.first_callback_waiting.set()
+            self.release_first_callback.wait(timeout=1)
+        self.callbacks.append(callback)
+        return "job-id"
+
+    def run_scheduled_callbacks(self) -> None:
+        for callback in self.callbacks:
+            callback()
+
+
 def _controller_for_status_tests() -> WeatherDisplayApp:
     app = object.__new__(WeatherDisplayApp)
     app.app_window = cast(Any, _FakeWindow())
@@ -286,6 +307,27 @@ def test_current_success_does_not_hide_forecast_failure() -> None:
     app._schedule_status_update()
 
     window = cast(_FakeWindow, app.app_window)
+    assert window.status_updates[-1] == (True, "offline", 123.0)
+
+
+def test_delayed_status_callback_reads_latest_combined_status() -> None:
+    app = _controller_for_status_tests()
+    window = _DeferredWindow()
+    app.app_window = cast(Any, window)
+    app._record_api_status("current", "ok")
+
+    older_update = threading.Thread(target=app._schedule_status_update)
+    older_update.start()
+    assert window.first_callback_waiting.wait(timeout=1)
+
+    app._record_api_status("forecast", "offline")
+    app._schedule_status_update()
+    window.release_first_callback.set()
+    older_update.join(timeout=1)
+    assert not older_update.is_alive()
+
+    window.run_scheduled_callbacks()
+
     assert window.status_updates[-1] == (True, "offline", 123.0)
 
 

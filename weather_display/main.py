@@ -549,17 +549,16 @@ class WeatherDisplayApp:
     def _schedule_status_update(self) -> None:
         if not self.app_window:
             return
-        connection_status = self.last_connection_status
-        api_status = self._combined_api_status()
-        success_time = self.last_forecast_success_time
-        self.app_window.after(
-            0,
-            lambda: self.app_window.update_status_indicators(
-                connection_status,
-                api_status,
-                success_time,
-            ),
-        )
+
+        def update_status_indicators() -> None:
+            if self.app_window:
+                self.app_window.update_status_indicators(
+                    self.last_connection_status,
+                    self._combined_api_status(),
+                    self.last_forecast_success_time,
+                )
+
+        self.app_window.after(0, update_status_indicators)
 
     def _update_time_and_date(self):
         """
