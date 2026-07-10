@@ -1,4 +1,7 @@
 from pathlib import Path
+from unittest.mock import patch
+
+import requests
 
 from weather_display.services.ims_lasthour import IMSLastHourWeather
 
@@ -91,3 +94,36 @@ def test_fetch_data_from_malformed_local_xml_returns_false(tmp_path: Path) -> No
 
     assert not weather.fetch_data(use_local_file=True, local_file_path=str(xml_path))
     assert weather.get_all_data() is None
+
+
+def test_station_network_error_returns_false_without_data() -> None:
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    with patch(
+        "weather_display.services.ims_lasthour.requests.get",
+        side_effect=requests.exceptions.ConnectionError("offline"),
+    ):
+        assert not weather.fetch_data()
+
+    assert weather.get_all_data() is None
+
+
+def test_empty_accessors_return_empty_or_none_before_fetching() -> None:
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    assert weather.get_all_data() is None
+    assert weather.get_metadata() is None
+    assert weather.get_measurement("TD") is None
+    assert weather.get_all_measurements() is None
+    assert weather.get_observation_time() is None
+    assert weather.get_hebrew_variables() == {}
+
+
+def test_list_all_stations_from_malformed_local_xml_returns_empty(tmp_path: Path) -> None:
+    xml_path = tmp_path / "imslasthour.xml"
+    xml_path.write_text("<ims><Observation>", encoding="utf-8")
+
+    assert IMSLastHourWeather.list_all_stations(
+        use_local_file=True,
+        local_file_path=str(xml_path),
+    ) == {}

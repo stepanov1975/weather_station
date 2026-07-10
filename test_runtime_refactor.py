@@ -10,13 +10,14 @@ import threading
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from weather_display import config, main as main_module
 from weather_display.main import WeatherDisplayApp
 from weather_display.services.ims_forecast import IMSCityForecast
+from weather_display.services.time_service import TimeService
 from weather_display.utils.helpers import check_internet_connection
 
 
@@ -25,13 +26,29 @@ class _FakeWindow:
         self.cancelled: list[str] = []
         self.destroyed = False
         self.status_updates: list[tuple[bool, str | None, float | None]] = []
+        self.time_updates: list[str] = []
+        self.date_updates: list[str] = []
+        self.scheduled_callbacks: list[Any] = []
+        self.mainloop_calls = 0
 
     def after_cancel(self, job_id: str) -> None:
         self.cancelled.append(job_id)
 
     def after(self, _delay: int, callback: Any) -> str:
-        callback()
+        if _delay == 0:
+            callback()
+        else:
+            self.scheduled_callbacks.append(callback)
         return "job-id"
+
+    def update_time(self, value: str) -> None:
+        self.time_updates.append(value)
+
+    def update_date(self, value: str) -> None:
+        self.date_updates.append(value)
+
+    def mainloop(self) -> None:
+        self.mainloop_calls += 1
 
     def winfo_exists(self) -> bool:
         return True
@@ -77,7 +94,98 @@ def _controller_for_status_tests() -> WeatherDisplayApp:
     app._current_api_status = None
     app._forecast_api_status = None
     app._status_lock = threading.Lock()
+    app.time_service = TimeService()
     return app
+
+
+def test_time_update_publishes_values_and_reschedules_when_running() -> None:
+    app = _controller_for_status_tests()
+    app.running = True
+    app._time_update_job_id = None
+    app.app_window.update_time = Mock()
+    app.app_window.update_date = Mock()
+    with patch(
+        "weather_display.main.TimeService.get_current_datetime",
+        return_value=("08:09:10", "Friday, 4 July 2026"),
+    ):
+        app._update_time_and_date()
+    app.app_window.update_time.assert_called_once_with("08:09:10")
+    app.app_window.update_date.assert_called_once_with("Friday, 4 July 2026")
+    assert app._time_update_job_id == "job-id"
+
+
+def test_windowed_start_runs_initial_updates_before_the_main_loop() -> None:
+    app = _controller_for_status_tests()
+    app.running = False
+    app.headless = False
+    app.ims_weather = cast(Any, object())
+    app.ims_forecast = cast(Any, object())
+    app._update_threads = []
+
+    with (
+        patch.object(app, "_start_update_threads") as start_threads,
+        patch.object(app, "_update_time_and_date") as update_time,
+        patch.object(app, "_update_weather") as update_weather,
+        patch.object(app, "_initial_forecast_update") as update_forecast,
+        patch.object(app, "stop") as stop,
+    ):
+        app.start()
+
+    start_threads.assert_called_once_with()
+    update_time.assert_called_once_with()
+    update_weather.assert_called_once_with()
+    update_forecast.assert_called_once_with()
+    assert cast(_FakeWindow, app.app_window).mainloop_calls == 1
+    stop.assert_called_once_with()
+
+
+def test_time_service_failure_reschedules_the_next_update() -> None:
+    app = _controller_for_status_tests()
+    app.running = True
+    app._time_update_job_id = None
+    app.time_service = SimpleNamespace(
+        get_current_datetime=Mock(side_effect=RuntimeError("clock unavailable"))
+    )
+
+    app._update_time_and_date()
+
+    window = cast(_FakeWindow, app.app_window)
+    assert len(window.scheduled_callbacks) == 1
+    assert app._time_update_job_id == "job-id"
+
+
+def test_cancel_time_update_cancels_the_registered_callback() -> None:
+    app = _controller_for_status_tests()
+    app._time_update_job_id = "clock-job"
+
+    app._cancel_time_update()
+
+    window = cast(_FakeWindow, app.app_window)
+    assert window.cancelled == ["clock-job"]
+    assert app._time_update_job_id is None
+
+
+def test_thread_creation_failure_does_not_start_a_one_off_update() -> None:
+    app = _controller_for_status_tests()
+    app._update_threads = []
+
+    with (
+        patch("weather_display.main.threading.Thread", side_effect=RuntimeError("no thread")),
+        pytest.raises(RuntimeError, match="no thread"),
+    ):
+        app._start_one_off_update(lambda: None, "TestUpdate")
+
+    assert app._update_threads == []
+
+
+def test_status_priority_reports_error_over_offline_and_ok() -> None:
+    app = _controller_for_status_tests()
+    app._record_api_status("current", "ok")
+    app._record_api_status("forecast", "offline")
+    assert app._combined_api_status() == "offline"
+
+    app._record_api_status("current", "error")
+    assert app._combined_api_status() == "error"
 
 
 def test_default_log_file_is_outside_project_tree() -> None:
