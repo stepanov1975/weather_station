@@ -144,12 +144,12 @@ def test_update_forecast_clears_frames_without_forecast_data() -> None:
 
     window.update_forecast({"data": []})
 
-    assert window.forecast_day_frames[0]["day"].values["text"] == get_translation(
-        "not_available", config.LANGUAGE
-    )
-    assert window.forecast_day_frames[0]["icon"].values == {"image": None, "text": ""}
-    assert window.forecast_day_frames[0]["condition"].values["text"] == ""
-    assert window.forecast_day_frames[0]["temp"].values["text"] == ""
+    not_available = get_translation("not_available", config.LANGUAGE)
+    for forecast_day in window.forecast_day_frames:
+        assert forecast_day["day"].values["text"] == not_available
+        assert forecast_day["icon"].values == {"image": None, "text": ""}
+        assert forecast_day["condition"].values["text"] == ""
+        assert forecast_day["temp"].values["text"] == ""
 
 
 @pytest.mark.parametrize(
