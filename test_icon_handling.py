@@ -118,7 +118,11 @@ def test_load_icon_caches_daytime_default_for_none_and_unknown_codes() -> None:
         patch("weather_display.utils.icon_handler.load_image", return_value=object()) as load,
     ):
         mock_datetime.now.return_value = datetime(2026, 7, 10, 12)
-        assert handler.load_icon(None, (32, 32)) is handler.load_icon(999, (32, 32))
+        default_icon = handler.load_icon(None, (32, 32))
+
+        assert default_icon is handler.load_icon(999, (32, 32))
+        assert default_icon is handler.load_icon(1, (32, 32))
+        assert "1_32x32" in handler.icon_cache
 
     load.assert_called_once()
 
