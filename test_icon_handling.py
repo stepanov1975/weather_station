@@ -11,6 +11,7 @@ This script tests the functionality of the WeatherIconHandler class:
 import logging
 import os
 import unittest
+from datetime import datetime
 from unittest.mock import patch
 
 # Import our icon handler
@@ -110,10 +111,15 @@ if __name__ == "__main__":
     unittest.main()
 
 
-def test_load_icon_caches_image_by_effective_code_and_size() -> None:
+def test_load_icon_caches_daytime_default_for_none_and_unknown_codes() -> None:
     handler = WeatherIconHandler()
-    with patch("weather_display.utils.icon_handler.load_image", return_value=object()) as load:
-        assert handler.load_icon(1, (32, 32)) is handler.load_icon(1, (32, 32))
+    with (
+        patch("weather_display.utils.icon_handler.datetime") as mock_datetime,
+        patch("weather_display.utils.icon_handler.load_image", return_value=object()) as load,
+    ):
+        mock_datetime.now.return_value = datetime(2026, 7, 10, 12)
+        assert handler.load_icon(None, (32, 32)) is handler.load_icon(999, (32, 32))
+
     load.assert_called_once()
 
 
@@ -127,3 +133,78 @@ def test_load_icon_does_not_cache_a_failed_image_load() -> None:
         assert handler.load_icon(1) is None
 
     assert load.call_count == 2
+
+
+@patch("weather_display.utils.icon_handler.datetime")
+def test_get_icon_path_uses_sunny_default_for_none_during_day(mock_datetime: object) -> None:
+    mock_datetime.now.return_value = datetime(2026, 7, 10, 12)  # type: ignore[attr-defined]
+
+    assert WeatherIconHandler().get_icon_path(None).endswith("01_sunny.png")  # type: ignore[union-attr]
+
+
+@patch("weather_display.utils.icon_handler.datetime")
+def test_get_icon_path_uses_clear_night_default_for_unknown_code(mock_datetime: object) -> None:
+    mock_datetime.now.return_value = datetime(2026, 7, 10, 23)  # type: ignore[attr-defined]
+
+    assert WeatherIconHandler().get_icon_path(999).endswith("33_clear_night.png")  # type: ignore[union-attr]
+
+
+def test_get_icon_path_returns_none_when_packaged_icon_is_missing() -> None:
+    handler = WeatherIconHandler()
+    with patch("weather_display.utils.icon_handler.os.path.exists", return_value=False):
+        assert handler.get_icon_path(1) is None
+
+
+def test_get_icon_by_condition_prefers_an_exact_description_match() -> None:
+    handler = WeatherIconHandler()
+    with patch.object(handler, "get_icon_path", return_value="sunny.png") as get_path:
+        assert handler.get_icon_by_condition("  sunny ") == "sunny.png"
+
+    get_path.assert_called_once_with(1)
+
+
+def test_get_icon_by_condition_uses_a_partial_description_match() -> None:
+    handler = WeatherIconHandler()
+    with patch.object(handler, "get_icon_path", return_value="storm.png") as get_path:
+        assert handler.get_icon_by_condition("thunder") == "storm.png"
+
+    get_path.assert_called_once_with(15)
+
+
+def test_get_icon_by_condition_falls_back_when_no_description_matches() -> None:
+    handler = WeatherIconHandler()
+    with patch.object(handler, "get_icon_path", return_value="default.png") as get_path:
+        assert handler.get_icon_by_condition("volcanic ash") == "default.png"
+
+    get_path.assert_called_once_with(None)
+
+
+def test_get_icon_by_condition_falls_back_when_condition_is_empty() -> None:
+    handler = WeatherIconHandler()
+    with patch.object(handler, "get_icon_path", return_value="default.png") as get_path:
+        assert handler.get_icon_by_condition("") == "default.png"
+
+    get_path.assert_called_once_with(None)
+
+
+def test_load_icon_returns_none_without_a_packaged_path() -> None:
+    handler = WeatherIconHandler()
+    with (
+        patch.object(handler, "get_icon_path", return_value=None),
+        patch("weather_display.utils.icon_handler.load_image") as load,
+    ):
+        assert handler.load_icon(1) is None
+
+    load.assert_not_called()
+
+
+def test_verify_all_icons_counts_only_existing_packaged_assets() -> None:
+    handler = WeatherIconHandler()
+    first_icon = next(iter(handler.ICON_MAPPING))
+    with patch(
+        "weather_display.utils.icon_handler.os.path.exists",
+        side_effect=lambda path: not path.endswith("01_sunny.png"),
+    ):
+        assert handler.verify_all_icons() == len(handler.ICON_MAPPING) - 1
+
+    assert first_icon == 1

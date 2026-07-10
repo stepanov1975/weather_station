@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 import pytest
+import requests
 
 from weather_display import main as main_module
 from weather_display.gui.app_window import AppWindow
@@ -403,3 +404,278 @@ def test_parse_arguments_reads_the_supported_cli_flags() -> None:
         args = main_module.parse_arguments()
 
     assert (args.mock, args.windowed, args.headless) == (True, True, True)
+
+
+def test_controller_stop_cancels_updates_joins_threads_and_destroys_window() -> None:
+    class JoinedThread:
+        name = "weather"
+
+        def __init__(self) -> None:
+            self.joined = False
+
+        def is_alive(self) -> bool:
+            return not self.joined
+
+        def join(self, timeout: float) -> None:
+            assert timeout == 2.0
+            self.joined = True
+
+    app = _headless_controller()
+    thread = JoinedThread()
+    app._stop_lock = threading.Lock()
+    app._time_update_job_id = "time-update"
+    app._update_threads = [thread]
+    app.app_window = Mock()
+    app.app_window.winfo_exists.return_value = True
+    window = app.app_window
+
+    with patch("weather_display.main.time.sleep") as sleep:
+        app.stop()
+
+    sleep.assert_called_once_with(0.5)
+    window.after_cancel.assert_called_once_with("time-update")
+    assert thread.joined is True
+    window.destroy.assert_called_once_with()
+    assert app.app_window is None
+
+
+def test_controller_stop_without_work_returns_without_sleeping() -> None:
+    app = _headless_controller()
+    app.running = False
+    app._time_update_job_id = None
+    app._update_threads = []
+    app.app_window = None
+
+    with patch("weather_display.main.time.sleep") as sleep:
+        app.stop()
+
+    sleep.assert_not_called()
+
+
+def test_controller_shutdown_logs_widget_and_thread_failures_without_raising() -> None:
+    app = _headless_controller()
+    app._time_update_job_id = "time-update"
+    app.app_window = Mock()
+    app.app_window.after_cancel.side_effect = RuntimeError("cancel failed")
+
+    failing_thread = Mock()
+    failing_thread.name = "failing"
+    failing_thread.is_alive.return_value = True
+    failing_thread.join.side_effect = RuntimeError("join failed")
+    app._update_threads = [failing_thread]
+
+    app._cancel_time_update()
+    app._join_update_threads()
+
+    app.app_window.winfo_exists.side_effect = RuntimeError("window failed")
+    app._destroy_window()
+
+    assert app._update_threads == []
+    assert app.app_window is not None
+
+
+def test_controller_start_runs_gui_initial_updates_then_stops_after_mainloop() -> None:
+    app = _headless_controller()
+    app.running = False
+    app.ims_weather = object()
+    app.ims_forecast = object()
+    app.app_window.mainloop = Mock()
+    app._start_update_threads = Mock()
+    app._update_time_and_date = Mock()
+    app._update_weather = Mock()
+    app._initial_forecast_update = Mock()
+    app.stop = Mock()
+
+    app.start()
+
+    app._start_update_threads.assert_called_once_with()
+    app._update_time_and_date.assert_called_once_with()
+    app._update_weather.assert_called_once_with()
+    app._initial_forecast_update.assert_called_once_with()
+    app.app_window.mainloop.assert_called_once_with()
+    app.stop.assert_called_once_with()
+
+
+def test_controller_start_headlessly_retries_interrupted_sleep_until_stopped() -> None:
+    app = _headless_controller()
+    app.headless = True
+    app.app_window = None
+    app.running = False
+    app.ims_weather = object()
+    app.ims_forecast = object()
+    app._start_update_threads = Mock()
+    app._update_weather = Mock()
+    app._initial_forecast_update = Mock()
+
+    def interrupt_then_stop(_seconds: int) -> None:
+        if not hasattr(interrupt_then_stop, "interrupted"):
+            interrupt_then_stop.interrupted = True  # type: ignore[attr-defined]
+            raise InterruptedError
+        app.running = False
+
+    with (
+        patch("weather_display.main.signal.signal") as register_signal,
+        patch("weather_display.main.time.sleep", side_effect=interrupt_then_stop),
+    ):
+        app.start()
+
+    assert register_signal.call_count == 2
+    app._update_weather.assert_called_once_with()
+    app._initial_forecast_update.assert_called_once_with()
+
+
+def test_controller_start_stops_invalid_non_gui_non_headless_state() -> None:
+    app = _headless_controller()
+    app.running = False
+    app.app_window = None
+    app.headless = False
+    app._start_update_threads = Mock()
+    app.stop = Mock()
+
+    app.start()
+
+    app.stop.assert_called_once_with()
+
+
+def test_controller_connection_monitor_recovers_after_a_check_error() -> None:
+    app = _headless_controller()
+    app._sleep_until_stop = Mock(side_effect=lambda _seconds: setattr(app, "running", False))
+
+    with patch("weather_display.main.check_internet_connection", side_effect=RuntimeError("network")):
+        app._connection_monitoring_loop()
+
+    app._sleep_until_stop.assert_called_once_with(30)
+
+
+def test_controller_starts_only_connection_monitor_when_ims_clients_are_unavailable() -> None:
+    class FakeThread:
+        def __init__(self, target: object, name: str, daemon: bool) -> None:
+            self.target = target
+            self.name = name
+            self.daemon = daemon
+            self.started = False
+
+        def start(self) -> None:
+            self.started = True
+
+    app = _headless_controller()
+    app.ims_weather = None
+    app.ims_forecast = None
+    with patch("weather_display.main.threading.Thread", FakeThread):
+        app._start_update_threads()
+
+    assert [thread.name for thread in app._update_threads] == ["ConnectionMonitorThread"]
+    assert app._update_threads[0].started is True
+
+
+def test_controller_starts_one_off_update_in_a_daemon_thread() -> None:
+    thread = Mock()
+    app = _headless_controller()
+
+    with patch("weather_display.main.threading.Thread", return_value=thread) as thread_type:
+        app._start_one_off_update(app._update_weather, "manual-refresh")
+
+    thread_type.assert_called_once_with(target=app._update_weather, name="manual-refresh", daemon=True)
+    thread.start.assert_called_once_with()
+    assert app._update_threads == [thread]
+
+
+def test_controller_destroy_window_leaves_nonexistent_window_intact() -> None:
+    app = _headless_controller()
+    window = Mock()
+    window.winfo_exists.return_value = False
+    app.app_window = window
+
+    app._destroy_window()
+
+    window.destroy.assert_not_called()
+    assert app.app_window is None
+
+
+@pytest.mark.parametrize(
+    ("measurements", "expected_data"),
+    [
+        (None, {}),
+        ({"TD": {"value": "21.5"}, "RH": {"value": "40"}}, {"temperature": 21.5, "humidity": 40}),
+    ],
+)
+def test_controller_weather_fetch_handles_empty_and_complete_measurements(
+    measurements: dict[str, dict[str, str]] | None, expected_data: dict[str, object]
+) -> None:
+    app = _headless_controller()
+    app.ims_weather = SimpleNamespace(fetch_data=Mock(return_value=True), get_all_measurements=Mock(return_value=measurements))
+
+    with patch("weather_display.main.config.USE_MOCK_DATA", False):
+        app._update_weather()
+
+    assert app.app_window.weather[-1]["data"] == expected_data
+    assert app._current_api_status == ("ok" if measurements else "error")
+
+
+def test_ims_fetch_returns_false_for_network_and_xml_parse_errors() -> None:
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    with patch(
+        "weather_display.services.ims_lasthour.requests.get",
+        side_effect=requests.exceptions.ConnectionError("offline"),
+    ):
+        assert weather.fetch_data() is False
+
+    response = SimpleNamespace(content=b"<ims>", raise_for_status=Mock())
+    with patch("weather_display.services.ims_lasthour.requests.get", return_value=response):
+        assert weather.fetch_data() is False
+
+
+def test_ims_fetch_parses_hebrew_names_and_prefers_exact_station_match(tmp_path: Path) -> None:
+    xml_path = tmp_path / "ims.xml"
+    xml_path.write_text(
+        """<ims><HebrewVariablesNames><TD>Temperature</TD></HebrewVariablesNames>
+        <Observation><stn_name>En Hahoresh North</stn_name><TD>25</TD></Observation>
+        <Observation><stn_name>En Hahoresh</stn_name><stn_num>123</stn_num>
+        <time_obs>2026-07-10T08:09:10</time_obs><TD>26</TD></Observation></ims>""",
+        encoding="utf-8",
+    )
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    assert weather.fetch_data(use_local_file=True, local_file_path=str(xml_path)) is True
+    assert weather.get_metadata() == {"StationName": "En Hahoresh", "StationNumber": "123"}
+    assert weather.get_measurement("TD") == {"value": "26", "description": "Temperature"}
+    assert weather.get_hebrew_variables() == {"TD": "Temperature"}
+
+
+def test_ims_accessors_return_none_before_data_is_fetched() -> None:
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    assert weather.get_all_data() is None
+    assert weather.get_metadata() is None
+    assert weather.get_measurement("TD") is None
+    assert weather.get_all_measurements() is None
+    assert weather.get_observation_time() is None
+
+
+def test_ims_list_all_stations_keeps_first_duplicate_and_skips_blank_names(tmp_path: Path) -> None:
+    xml_path = tmp_path / "stations.xml"
+    xml_path.write_text(
+        """<ims><Observation><stn_name> Alpha </stn_name><stn_num>1</stn_num></Observation>
+        <Observation><stn_name>Alpha</stn_name><stn_num>99</stn_num></Observation>
+        <Observation><stn_name> </stn_name></Observation>
+        <Observation><stn_name>Beta</stn_name></Observation></ims>""",
+        encoding="utf-8",
+    )
+
+    assert IMSLastHourWeather.list_all_stations(use_local_file=True, local_file_path=str(xml_path)) == {
+        "Alpha": {"StationNumber": "1"},
+        "Beta": {},
+    }
+
+
+def test_ims_list_all_stations_returns_empty_for_network_and_xml_parse_errors() -> None:
+    with patch(
+        "weather_display.services.ims_lasthour.requests.get",
+        side_effect=requests.exceptions.ConnectionError("offline"),
+    ):
+        assert IMSLastHourWeather.list_all_stations() == {}
+
+    response = SimpleNamespace(content=b"<ims>", raise_for_status=Mock())
+    with patch("weather_display.services.ims_lasthour.requests.get", return_value=response):
+        assert IMSLastHourWeather.list_all_stations() == {}
