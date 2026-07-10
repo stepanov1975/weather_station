@@ -28,18 +28,27 @@ class _FakeWindow:
         self.status_updates: list[tuple[bool, str | None, float | None]] = []
         self.time_updates: list[str] = []
         self.date_updates: list[str] = []
-        self.scheduled_callbacks: list[Any] = []
+        self.scheduled_callbacks: dict[str, Any] = {}
+        self._next_job_id = 0
         self.mainloop_calls = 0
 
     def after_cancel(self, job_id: str) -> None:
         self.cancelled.append(job_id)
+        self.scheduled_callbacks.pop(job_id, None)
 
     def after(self, _delay: int, callback: Any) -> str:
+        self._next_job_id += 1
+        job_id = f"job-{self._next_job_id}"
         if _delay == 0:
             callback()
         else:
-            self.scheduled_callbacks.append(callback)
-        return "job-id"
+            self.scheduled_callbacks[job_id] = callback
+        return job_id
+
+    def run_scheduled_callbacks(self) -> None:
+        for job_id in list(self.scheduled_callbacks):
+            callback = self.scheduled_callbacks.pop(job_id)
+            callback()
 
     def update_time(self, value: str) -> None:
         self.time_updates.append(value)
@@ -111,7 +120,7 @@ def test_time_update_publishes_values_and_reschedules_when_running() -> None:
         app._update_time_and_date()
     app.app_window.update_time.assert_called_once_with("08:09:10")
     app.app_window.update_date.assert_called_once_with("Friday, 4 July 2026")
-    assert app._time_update_job_id == "job-id"
+    assert app._time_update_job_id == "job-1"
 
 
 def test_windowed_start_runs_initial_updates_before_the_main_loop() -> None:
@@ -121,21 +130,25 @@ def test_windowed_start_runs_initial_updates_before_the_main_loop() -> None:
     app.ims_weather = cast(Any, object())
     app.ims_forecast = cast(Any, object())
     app._update_threads = []
+    events: list[str] = []
+    window = cast(_FakeWindow, app.app_window)
+    window.mainloop = Mock(side_effect=lambda: events.append("mainloop"))
 
     with (
-        patch.object(app, "_start_update_threads") as start_threads,
-        patch.object(app, "_update_time_and_date") as update_time,
-        patch.object(app, "_update_weather") as update_weather,
-        patch.object(app, "_initial_forecast_update") as update_forecast,
+        patch.object(app, "_start_update_threads", side_effect=lambda: events.append("threads")),
+        patch.object(app, "_update_time_and_date", side_effect=lambda: events.append("time")),
+        patch.object(app, "_update_weather", side_effect=lambda: events.append("weather")),
+        patch.object(
+            app,
+            "_initial_forecast_update",
+            side_effect=lambda: events.append("forecast"),
+        ),
         patch.object(app, "stop") as stop,
     ):
         app.start()
 
-    start_threads.assert_called_once_with()
-    update_time.assert_called_once_with()
-    update_weather.assert_called_once_with()
-    update_forecast.assert_called_once_with()
-    assert cast(_FakeWindow, app.app_window).mainloop_calls == 1
+    assert events == ["threads", "time", "weather", "forecast", "mainloop"]
+    window.mainloop.assert_called_once_with()
     stop.assert_called_once_with()
 
 
@@ -151,18 +164,26 @@ def test_time_service_failure_reschedules_the_next_update() -> None:
 
     window = cast(_FakeWindow, app.app_window)
     assert len(window.scheduled_callbacks) == 1
-    assert app._time_update_job_id == "job-id"
+    assert app._time_update_job_id == "job-1"
 
 
 def test_cancel_time_update_cancels_the_registered_callback() -> None:
     app = _controller_for_status_tests()
-    app._time_update_job_id = "clock-job"
+    app.running = True
+    app._time_update_job_id = None
+    app.time_service = SimpleNamespace(
+        get_current_datetime=Mock(return_value=("08:09:10", "Friday, 4 July 2026"))
+    )
+
+    app._update_time_and_date()
+    window = cast(_FakeWindow, app.app_window)
 
     app._cancel_time_update()
+    window.run_scheduled_callbacks()
 
-    window = cast(_FakeWindow, app.app_window)
-    assert window.cancelled == ["clock-job"]
+    assert window.cancelled == ["job-1"]
     assert app._time_update_job_id is None
+    assert window.time_updates == ["08:09:10"]
 
 
 def test_thread_creation_failure_does_not_start_a_one_off_update() -> None:
