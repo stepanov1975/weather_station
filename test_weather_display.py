@@ -53,16 +53,23 @@ class TestWeatherDisplay(unittest.TestCase):
         self.assertIsNotNone(date_str)
         self.assertIn(',', date_str)
         self.assertRegex(date_str, r'\d{4}$')
-        
+
         # Get current datetime
         time_str, date_str = time_service.get_current_datetime()
-        
+
         # Verify that we got valid time and date strings
         self.assertIsNotNone(time_str)
         self.assertRegex(time_str, r'^\d{2}:\d{2}:\d{2}$')
         self.assertIsNotNone(date_str)
         self.assertIn(',', date_str)
         self.assertRegex(date_str, r'\d{4}$')
+
+    def test_time_service_uses_localized_date_formatter(self):
+        with patch("weather_display.services.time_service.get_formatted_date", return_value="Friday") as formatter:
+            with patch("weather_display.services.time_service.config.LANGUAGE", "en"):
+                self.assertEqual(TimeService.get_current_date(), "Friday")
+
+        formatter.assert_called_once_with("en")
 
 
 if __name__ == '__main__':

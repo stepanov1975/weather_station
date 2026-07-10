@@ -108,3 +108,22 @@ class TestWeatherIconHandler(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_load_icon_caches_image_by_effective_code_and_size() -> None:
+    handler = WeatherIconHandler()
+    with patch("weather_display.utils.icon_handler.load_image", return_value=object()) as load:
+        assert handler.load_icon(1, (32, 32)) is handler.load_icon(1, (32, 32))
+    load.assert_called_once()
+
+
+def test_load_icon_does_not_cache_a_failed_image_load() -> None:
+    handler = WeatherIconHandler()
+    with (
+        patch.object(handler, "get_icon_path", return_value="icon.png"),
+        patch("weather_display.utils.icon_handler.load_image", return_value=None) as load,
+    ):
+        assert handler.load_icon(1) is None
+        assert handler.load_icon(1) is None
+
+    assert load.call_count == 2
