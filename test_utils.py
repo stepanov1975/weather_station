@@ -53,6 +53,20 @@ def test_weather_condition_translates_muggy_without_warning(
     assert "No translation mapping found" not in caplog.text
 
 
+@pytest.mark.parametrize(
+    ("condition", "expected"),
+    [
+        ("Sleet", "Мокрый снег"),
+        ("Frost", "Мороз"),
+        ("Stormy", "Шторм"),
+        ("Cloudy, possible rain", "Облачно, возможен дождь"),
+        ("Partly cloudy, possible rain", "Переменная облачность, возможен дождь"),
+    ],
+)
+def test_official_ims_conditions_are_translated(condition: str, expected: str) -> None:
+    assert translate_weather_condition(condition, "ru") == expected
+
+
 def test_day_name_localization_accepts_iso_date_and_rejects_invalid_input() -> None:
     assert get_day_name_localized("2026-07-10T08:09:10+03:00", "en") == "Friday"
     assert get_day_name_localized("not-a-date", "en") == "Unknown"

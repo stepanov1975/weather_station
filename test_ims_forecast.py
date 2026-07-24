@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Tests for IMS city portal forecast parsing."""
 
+import json
 import unittest
+from datetime import date
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -46,7 +48,7 @@ class TestIMSCityForecast(unittest.TestCase):
         }
 
         client = IMSCityForecast(location_id=18)
-        forecast = client.parse_forecast(payload, days=2)
+        forecast = client.parse_forecast(payload, days=2, today=date(2026, 7, 3))
 
         self.assertEqual(forecast[0]["date"], "2026-07-03")
         self.assertEqual(forecast[0]["max_temp"], 30.0)
@@ -75,12 +77,11 @@ def test_network_failure_uses_the_cached_payload(tmp_path: Path) -> None:
     ):
         result = client.fetch_payload(force_refresh=True)
 
-    assert result == {
-        "data": cached_payload,
-        "connection_status": False,
-        "api_status": "offline",
-        "cache_hit": True,
-    }
+    assert result["data"] == cached_payload
+    assert result["connection_status"] is False
+    assert result["api_status"] == "offline"
+    assert result["cache_hit"] is True
+    assert result["cache_timestamp"] == client.cache.timestamp
 
 
 def test_invalid_json_payload_is_reported_as_a_fetch_error(tmp_path: Path) -> None:
@@ -96,6 +97,18 @@ def test_invalid_json_payload_is_reported_as_a_fetch_error(tmp_path: Path) -> No
     assert result["connection_status"] is False
     assert result["api_status"] == "error"
     assert result["cache_hit"] is False
+
+
+def test_forecast_request_uses_short_connect_and_read_timeouts(tmp_path: Path) -> None:
+    client = IMSCityForecast(location_id=18, cache_path=tmp_path / "forecast.json")
+    response = Mock()
+    response.raise_for_status.return_value = None
+    response.json.return_value = {"data": {}}
+
+    with patch("weather_display.services.ims_forecast.requests.get", return_value=response) as get:
+        client.fetch_payload(force_refresh=True)
+
+    get.assert_called_once_with(client.url, timeout=(3, 10))
 
 
 def test_missing_forecast_data_returns_no_days() -> None:
@@ -122,7 +135,7 @@ def test_nonnumeric_forecast_temperatures_remain_empty() -> None:
         }
     }
 
-    assert client.parse_forecast(payload) == [
+    assert client.parse_forecast(payload, today=date(2026, 7, 3)) == [
         {
             "date": "2026-07-03",
             "max_temp": None,
@@ -151,7 +164,44 @@ def test_unknown_weather_code_is_preserved_with_the_default_icon() -> None:
         }
     }
 
-    forecast = client.parse_forecast(payload)
+    forecast = client.parse_forecast(payload, today=date(2026, 7, 3))
 
     assert forecast[0]["condition"] == "9999"
     assert forecast[0]["icon_code"] == 7
+
+
+def test_past_forecast_dates_are_excluded() -> None:
+    client = IMSCityForecast(location_id=18)
+    payload = {
+        "data": {
+            "weather_codes": {"1250": {"desc_en": "Clear"}},
+            "forecast_data": {
+                forecast_date: {
+                    "daily": {
+                        "forecast_date": forecast_date,
+                        "maximum_temperature": "30",
+                        "minimum_temperature": "20",
+                        "weather_code": "1250",
+                    }
+                }
+                for forecast_date in ("2026-07-23", "2026-07-24", "2026-07-25")
+            },
+        }
+    }
+
+    forecast = client.parse_forecast(payload, days=3, today=date(2026, 7, 24))
+
+    assert [day["date"] for day in forecast] == ["2026-07-24", "2026-07-25"]
+
+
+def test_real_ims_weather_codes_use_specific_bundled_icons() -> None:
+    fixture_path = Path(__file__).parent / "tests" / "fixtures" / "ims_city_conditions.json"
+    payload = json.loads(fixture_path.read_text(encoding="utf-8"))
+
+    forecast = IMSCityForecast(location_id=18).parse_forecast(
+        payload,
+        days=8,
+        today=date(2026, 7, 24),
+    )
+
+    assert [day["icon_code"] for day in forecast] == [25, 32, 30, 24, 15, 14, 13, 13]

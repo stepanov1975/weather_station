@@ -1,0 +1,24 @@
+{
+  "data": {
+    "weather_codes": {
+      "1080": {"desc_en": "Sleet"},
+      "1260": {"desc_en": "Windy"},
+      "1270": {"desc_en": "Muggy"},
+      "1300": {"desc_en": "Frost"},
+      "1510": {"desc_en": "Stormy"},
+      "1530": {"desc_en": "Partly cloudy, possible rain"},
+      "1540": {"desc_en": "Cloudy, possible rain"},
+      "1560": {"desc_en": "Cloudy, light rain"}
+    },
+    "forecast_data": {
+      "2026-07-24": {"daily": {"forecast_date": "2026-07-24", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1080"}},
+      "2026-07-25": {"daily": {"forecast_date": "2026-07-25", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1260"}},
+      "2026-07-26": {"daily": {"forecast_date": "2026-07-26", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1270"}},
+      "2026-07-27": {"daily": {"forecast_date": "2026-07-27", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1300"}},
+      "2026-07-28": {"daily": {"forecast_date": "2026-07-28", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1510"}},
+      "2026-07-29": {"daily": {"forecast_date": "2026-07-29", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1530"}},
+      "2026-07-30": {"daily": {"forecast_date": "2026-07-30", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1540"}},
+      "2026-07-31": {"daily": {"forecast_date": "2026-07-31", "maximum_temperature": "30", "minimum_temperature": "20", "weather_code": "1560"}}
+    }
+  }
+}

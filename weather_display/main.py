@@ -148,8 +148,13 @@ class WeatherDisplayApp:
         self._time_update_job_id: Optional[str] = None # For cancelling Tkinter 'after' job
         self._stop_lock = threading.Lock()
         self._status_lock = threading.Lock()
+        self._stop_event = threading.Event()
+        self._current_update_lock = threading.Lock()
+        self._forecast_update_lock = threading.Lock()
         self._current_api_status: str | None = None
         self._forecast_api_status: str | None = None
+        self._last_current_weather_data: dict[str, Any] = {}
+        self._connection_status_initialized = False
 
         logger.info("Initializing application components...")
 
@@ -194,10 +199,9 @@ class WeatherDisplayApp:
         else:
             logger.info("Running in headless mode (no GUI will be displayed).")
 
-        # Track connection status for triggering immediate updates on reconnect
-        # Perform an initial check; background thread will monitor continuously.
-        self.last_connection_status: bool = check_internet_connection()
-        logger.info(f"Initial internet connection status: {'Connected' if self.last_connection_status else 'Disconnected'}")
+        # The background monitor publishes the first connection state without
+        # delaying GUI startup.
+        self.last_connection_status = False
 
         # Store the timestamp of the last successful IMS city forecast call
         self.last_forecast_success_time: Optional[float] = None
@@ -220,19 +224,19 @@ class WeatherDisplayApp:
             return
 
         self.running = True
+        stop_event = getattr(self, "_stop_event", None)
+        if stop_event is None:
+            stop_event = self._stop_event = threading.Event()
+        stop_event.clear()
         logger.info("Starting application...")
 
-        # Start background threads for weather updates and connection monitoring
-        self._start_update_threads()
+        signal.signal(signal.SIGINT, self._handle_signal)
+        signal.signal(signal.SIGTERM, self._handle_signal)
 
         if self.app_window:
             logger.info("Performing initial GUI updates...")
-            # Perform initial data fetches and GUI updates before starting the main loop
             self._update_time_and_date() # Initial time/date display
-            if self.ims_weather:
-                self._update_weather() # Initial IMS weather fetch and display
-            if self.ims_forecast:
-                self._initial_forecast_update() # Use cache-aware initial IMS forecast fetch
+            self.app_window.after(0, self._start_background_updates)
 
             logger.info("Starting GUI main loop (Tkinter)...")
             # Start the Tkinter main event loop. This call blocks until the window
@@ -247,25 +251,13 @@ class WeatherDisplayApp:
         elif self.headless:
             logger.info("Running in headless mode. Update loops active in background.")
             logger.info("Press Ctrl+C to stop the application.")
-            if self.ims_weather:
-                self._update_weather()
-            if self.ims_forecast:
-                self._initial_forecast_update()
-            # Set up signal handlers for graceful shutdown in headless mode
-            # SIGINT (Ctrl+C) and SIGTERM are common termination signals.
-            signal.signal(signal.SIGINT, self._handle_signal)
-            signal.signal(signal.SIGTERM, self._handle_signal)
+            self._start_background_updates()
 
             # Keep the main thread alive while background threads do their work.
             # The loop checks the `running` flag, which is set to False by `stop()`.
             while self.running:
-                try:
-                    # Sleep prevents this loop from consuming 100% CPU.
-                    time.sleep(1)
-                except InterruptedError:
-                    # Catch potential interruption if signal handling happens mid-sleep
-                    logger.debug("Main headless loop sleep interrupted.")
-                    continue # Re-check self.running status
+                if not self._sleep_until_stop(1):
+                    break
 
             logger.info("Headless run finished.")
             # Stop might have already been called by signal handler, but ensure cleanup
@@ -303,8 +295,10 @@ class WeatherDisplayApp:
 
         logger.info("Stopping application gracefully...")
         self.running = False
+        stop_event = getattr(self, "_stop_event", None)
+        if stop_event is not None:
+            stop_event.set()
 
-        time.sleep(0.5)
         self._cancel_time_update()
         self._join_update_threads()
         self._destroy_window()
@@ -402,6 +396,22 @@ class WeatherDisplayApp:
 
         logger.info(f"Started {len(self._update_threads)} background update threads.")
 
+    def _start_background_updates(self) -> None:
+        """Starts periodic workers and immediate non-blocking data refreshes."""
+        if not self.running:
+            return
+        self._start_update_threads()
+        self._start_initial_updates()
+
+    def _start_initial_updates(self) -> None:
+        if self.ims_weather:
+            self._start_one_off_update(self._update_weather, "IMSInitialUpdate")
+        if self.ims_forecast:
+            self._start_one_off_update(
+                self._initial_forecast_update,
+                "IMSForecastInitialUpdate",
+            )
+
     def _create_update_thread(self, target: Callable[[], None], name: str) -> None:
         self._update_threads.append(threading.Thread(target=target, name=name, daemon=True))
 
@@ -410,12 +420,11 @@ class WeatherDisplayApp:
         self._update_threads.append(thread)
         thread.start()
 
-    def _sleep_until_stop(self, seconds: int) -> bool:
-        for _ in range(seconds):
-            if not self.running:
-                return False
-            time.sleep(1)
-        return self.running
+    def _sleep_until_stop(self, seconds: int | float) -> bool:
+        stop_event = getattr(self, "_stop_event", None)
+        if stop_event is None:
+            stop_event = self._stop_event = threading.Event()
+        return self.running and not stop_event.wait(seconds)
 
     def _weather_update_loop(self):
         """
@@ -493,8 +502,10 @@ class WeatherDisplayApp:
             try:
                 current_status = check_internet_connection()
 
-                # Detect if connection was just restored
-                if not self.last_connection_status and current_status:
+                status_was_initialized = getattr(self, "_connection_status_initialized", True)
+
+                # Detect if connection was restored after the initial check.
+                if status_was_initialized and not self.last_connection_status and current_status:
                     logger.info("Internet connection restored. Triggering immediate weather updates.")
                     # Trigger immediate updates in non-blocking threads
                     if self.ims_weather:
@@ -503,7 +514,7 @@ class WeatherDisplayApp:
                         self._start_one_off_update(self._update_forecast_data, "IMSForecastImmediateUpdate")
 
                 # Log status change only if it actually changed
-                if self.last_connection_status != current_status:
+                if not status_was_initialized or self.last_connection_status != current_status:
                      status_text = 'Connected' if current_status else 'Disconnected'
                      log_msg = f"Connection status changed: {status_text}"
                      # Log differently based on mode (GUI updates indicators visually)
@@ -513,6 +524,7 @@ class WeatherDisplayApp:
                          logger.debug(log_msg + " (GUI indicators will reflect this)")
                      # Update the tracked status
                      self.last_connection_status = current_status
+                     self._connection_status_initialized = True
                      self._schedule_status_update()
                 else:
                      logger.debug(f"Connection status remains: {'Connected' if current_status else 'Disconnected'}")
@@ -603,6 +615,17 @@ class WeatherDisplayApp:
 
 
     def _update_weather(self) -> None:
+        update_lock = getattr(self, "_current_update_lock", None)
+        if update_lock is not None and not update_lock.acquire(blocking=False):
+            logger.info("Skipping overlapping IMS weather update.")
+            return
+        try:
+            self._update_weather_unlocked()
+        finally:
+            if update_lock is not None:
+                update_lock.release()
+
+    def _update_weather_unlocked(self) -> None:
         """
         Fetches the latest weather data from the IMS service and updates the GUI.
 
@@ -621,6 +644,7 @@ class WeatherDisplayApp:
         connection_status = False # Assume disconnected initially
         api_status = 'error' # Default to error until success confirmed
         current_weather_data: dict[str, Any] = {} # Initialize empty data dict
+        stale = False
 
         try:
             # Check if mock data is enabled globally
@@ -656,13 +680,22 @@ class WeatherDisplayApp:
                     logger.error("Failed to fetch data from IMS service.")
                     # Keep api_status as 'error', connection_status is already False
 
+            if current_weather_data:
+                self._last_current_weather_data = current_weather_data.copy()
+            else:
+                previous_data = getattr(self, "_last_current_weather_data", {})
+                if previous_data:
+                    current_weather_data = previous_data.copy()
+                    stale = True
+
             # Update GUI if it exists, ensuring it runs on the main thread
             if self.app_window:
                 # Prepare the payload for the main weather update
                 update_payload = {
                     'data': current_weather_data,
                     'connection_status': connection_status,
-                    'api_status': api_status # Status specific to this IMS fetch ('ok', 'error', 'mock')
+                    'api_status': api_status, # Status specific to this IMS fetch ('ok', 'error', 'mock')
+                    'stale': stale,
                 }
                 # Use after(0, ...) to schedule the update on the main Tkinter event loop
                 # Pass a copy of the payload to avoid potential race conditions if the dict is modified later
@@ -689,7 +722,18 @@ class WeatherDisplayApp:
             self._record_api_status("current", "error")
             self._schedule_status_update()
 
-    def _update_forecast_data(self, force_refresh: bool = True):
+    def _update_forecast_data(self, force_refresh: bool = True) -> None:
+        update_lock = getattr(self, "_forecast_update_lock", None)
+        if update_lock is not None and not update_lock.acquire(blocking=False):
+            logger.info("Skipping overlapping IMS forecast update.")
+            return
+        try:
+            self._update_forecast_data_unlocked(force_refresh=force_refresh)
+        finally:
+            if update_lock is not None:
+                update_lock.release()
+
+    def _update_forecast_data_unlocked(self, force_refresh: bool = True) -> None:
         """
         Fetches IMS city forecast data and updates the GUI.
 
@@ -705,10 +749,14 @@ class WeatherDisplayApp:
             forecast_result = self.ims_forecast.get_forecast(force_refresh=force_refresh)
             forecast_api_status = forecast_result.get('api_status', 'error')
             final_conn_status = forecast_result.get('connection_status')
+            cache_timestamp = forecast_result.get('cache_timestamp')
+
+            if isinstance(cache_timestamp, (int, float)):
+                self.last_forecast_success_time = float(cache_timestamp)
 
             if forecast_api_status == 'ok':
                 final_api_status = 'ok'
-                if not forecast_result.get('cache_hit'):
+                if cache_timestamp is None and not forecast_result.get('cache_hit'):
                     self.last_forecast_success_time = time.time()
             elif forecast_api_status == 'mock':
                 final_api_status = 'mock'
@@ -823,17 +871,6 @@ def main() -> None:
     if args.windowed:
         logger.info("OVERRIDE: Forcing windowed mode via command line argument (--windowed).")
         config.FULLSCREEN = False # Override config setting
-
-    # --- Pre-run Checks ---
-    # Do not block Raspberry Pi boot on network availability. Services can use
-    # cached data immediately and retry live IMS calls in the background.
-    if not config.USE_MOCK_DATA:
-        if check_internet_connection():
-            logger.info("Initial internet connection check succeeded.")
-        else:
-            logger.warning("Initial internet connection check failed; starting with cache/offline state.")
-    else:
-        logger.info("Skipping internet connection check because mock data mode is enabled.")
 
     # --- Application Initialization and Start ---
     app: Optional[WeatherDisplayApp] = None # Initialize app variable

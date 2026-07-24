@@ -103,6 +103,10 @@ def _controller_for_status_tests() -> WeatherDisplayApp:
     app._current_api_status = None
     app._forecast_api_status = None
     app._status_lock = threading.Lock()
+    app._stop_event = threading.Event()
+    app._current_update_lock = threading.Lock()
+    app._forecast_update_lock = threading.Lock()
+    app._connection_status_initialized = True
     app.time_service = TimeService()
     return app
 
@@ -123,7 +127,7 @@ def test_time_update_publishes_values_and_reschedules_when_running() -> None:
     assert app._time_update_job_id == "job-1"
 
 
-def test_windowed_start_runs_initial_updates_before_the_main_loop() -> None:
+def test_windowed_start_schedules_initial_updates_before_the_main_loop() -> None:
     app = _controller_for_status_tests()
     app.running = False
     app.headless = False
@@ -137,17 +141,20 @@ def test_windowed_start_runs_initial_updates_before_the_main_loop() -> None:
     with (
         patch.object(app, "_start_update_threads", side_effect=lambda: events.append("threads")),
         patch.object(app, "_update_time_and_date", side_effect=lambda: events.append("time")),
-        patch.object(app, "_update_weather", side_effect=lambda: events.append("weather")),
-        patch.object(
-            app,
-            "_initial_forecast_update",
-            side_effect=lambda: events.append("forecast"),
-        ),
+        patch.object(app, "_start_one_off_update", side_effect=lambda _target, name: events.append(name)),
+        patch("weather_display.main.signal.signal") as register_signal,
         patch.object(app, "stop") as stop,
     ):
         app.start()
 
-    assert events == ["threads", "time", "weather", "forecast", "mainloop"]
+    assert events == [
+        "time",
+        "threads",
+        "IMSInitialUpdate",
+        "IMSForecastInitialUpdate",
+        "mainloop",
+    ]
+    assert register_signal.call_count == 2
     window.mainloop.assert_called_once_with()
     stop.assert_called_once_with()
 
@@ -395,15 +402,16 @@ def test_main_starts_app_when_network_is_unavailable() -> None:
         patch.object(main_module, "configure_logging"),
         patch.object(main_module, "parse_arguments", return_value=args),
         patch.object(main_module.config, "USE_MOCK_DATA", False),
-        patch.object(main_module, "check_internet_connection", return_value=False),
+        patch.object(main_module, "check_internet_connection") as connection_check,
         patch.object(main_module, "WeatherDisplayApp", return_value=fake_app) as app_class,
     ):
         main_module.main()
 
     app_class.assert_called_once_with(headless=True)
+    connection_check.assert_not_called()
 
 
-def test_headless_start_fetches_initial_data_before_sleeping() -> None:
+def test_headless_start_launches_initial_data_workers_before_waiting() -> None:
     app = object.__new__(WeatherDisplayApp)
     app.running = False
     app.headless = True
@@ -411,24 +419,20 @@ def test_headless_start_fetches_initial_data_before_sleeping() -> None:
     app.ims_weather = cast(Any, object())
     app.ims_forecast = cast(Any, object())
     app._update_threads = []
+    app._stop_event = threading.Event()
 
     calls: list[str] = []
 
-    def stop_after_initial_sleep(_seconds: float) -> None:
-        calls.append("sleep")
-        app.running = False
-
     with (
         patch.object(app, "_start_update_threads", side_effect=lambda: calls.append("threads")),
-        patch.object(app, "_update_weather", side_effect=lambda: calls.append("weather")),
-        patch.object(app, "_initial_forecast_update", side_effect=lambda: calls.append("forecast")),
+        patch.object(app, "_start_one_off_update", side_effect=lambda _target, name: calls.append(name)),
+        patch.object(app, "_sleep_until_stop", side_effect=lambda _seconds: False),
         patch("weather_display.main.signal.signal"),
-        patch("weather_display.main.time.sleep", side_effect=stop_after_initial_sleep),
+        patch("weather_display.main.time.sleep", side_effect=lambda _seconds: setattr(app, "running", False)),
     ):
         app.start()
 
-    assert calls[:3] == ["threads", "weather", "forecast"]
-    assert "sleep" in calls
+    assert calls == ["threads", "IMSInitialUpdate", "IMSForecastInitialUpdate"]
 
 
 def test_weather_update_exception_updates_status_with_required_arguments() -> None:

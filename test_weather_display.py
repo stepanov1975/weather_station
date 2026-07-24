@@ -8,6 +8,7 @@ This script tests the Weather Display application with mock data.
 import os
 import sys
 import unittest
+from datetime import date
 from unittest.mock import patch
 
 # Add the parent directory to the path so we can import the weather_display package
@@ -30,6 +31,7 @@ class TestWeatherDisplay(unittest.TestCase):
         self.assertEqual(forecast["api_status"], "mock")
         self.assertEqual(len(forecast["data"]), 3)
         for day in forecast["data"]:
+            self.assertGreaterEqual(date.fromisoformat(day["date"]), date.today())
             self.assertIn('date', day)
             self.assertIn('max_temp', day)
             self.assertIn('min_temp', day)

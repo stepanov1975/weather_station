@@ -296,11 +296,15 @@ class AppWindow(ctk.CTk):
         text_color = self._get_color('status_text')
         padx = config.ELEMENT_PADDING['padx'] // 2 # Use smaller padding for persistent labels
         pady = config.ELEMENT_PADDING['pady'] // 2
+        pending_text = get_translation('status_pending', config.LANGUAGE)
 
         # --- Network Status Label ---
         self.network_status_label = ctk.CTkLabel(
             self.status_bar_frame,
-            text="Network: Pending", # Initial text
+            text=(
+                f"{get_translation('network_status', config.LANGUAGE)}: "
+                f"{pending_text}"
+            ),
             font=indicator_font,
             text_color=text_color,
             anchor="e"
@@ -311,7 +315,10 @@ class AppWindow(ctk.CTk):
         # --- API Status Label ---
         self.api_status_label = ctk.CTkLabel(
             self.status_bar_frame,
-            text="API: Pending", # Initial text
+            text=(
+                f"{get_translation('api_status', config.LANGUAGE)}: "
+                f"{pending_text}"
+            ),
             font=indicator_font,
             text_color=text_color,
             anchor="e"
@@ -595,8 +602,7 @@ class AppWindow(ctk.CTk):
         current_data = weather_result.get('data', {})
         if not current_data:
              logger.warning("Received empty 'data' dictionary in update_current_weather. Cannot update labels.")
-             # Optionally set labels to NA here if desired, but they should retain previous value otherwise.
-             # return # Or return early
+             return
 
         na_text = get_translation('not_available', config.LANGUAGE)
 
@@ -695,14 +701,19 @@ class AppWindow(ctk.CTk):
         logger.debug(f"Updating status indicators: Connection={connection_status}, API Status='{api_status}', Last Success Time={last_success_time}")
 
         # --- Update Network Status Label ---
-        network_text = "Network: OK" if connection_status else "Network: Offline"
-        # TODO: Add localization for network status text
-        # TODO: Add color coding based on status (e.g., green for OK, red for Offline)
+        network_label = get_translation('network_status', config.LANGUAGE)
+        api_label = get_translation('api_status', config.LANGUAGE)
+        ok_text = get_translation('status_ok', config.LANGUAGE)
+        offline_text = get_translation('status_offline', config.LANGUAGE)
+        error_text = get_translation('status_error', config.LANGUAGE)
+        mock_text = get_translation('status_mock', config.LANGUAGE)
+        pending_text = get_translation('status_pending', config.LANGUAGE)
+        network_text = f"{network_label}: {ok_text if connection_status else offline_text}"
         network_color = self._get_color("status_ok_text") if connection_status else self._get_color("status_error_text")
         self.network_status_label.configure(text=network_text, text_color=network_color)
 
         # --- Update API Status Label ---
-        api_text = "API: Pending" # Default
+        api_text = f"{api_label}: {pending_text}"
         api_color = self._get_color("status_text") # Default color
 
         # Format the last success time if available
@@ -718,29 +729,28 @@ class AppWindow(ctk.CTk):
         if api_status == 'ok':
             # If last_success_time is None, it might be an IMS 'ok' status
             time_suffix = f" ({success_time_str})" if last_success_time else ""
-            api_text = f"API: OK{time_suffix}"
+            api_text = f"{api_label}: {ok_text}{time_suffix}"
             api_color = self._get_color("status_ok_text")
         elif api_status == 'error':
-            api_text = f"API: Error ({success_time_str})"
+            api_text = f"{api_label}: {error_text} ({success_time_str})"
             api_color = self._get_color("status_error_text")
         elif api_status == 'mock':
-            api_text = "API: Mock" # No time needed for mock
+            api_text = f"{api_label}: {mock_text}"
             api_color = self._get_color("status_text") # Neutral color
         elif api_status == 'offline':
-             api_text = f"API: Offline ({success_time_str})"
+             api_text = f"{api_label}: {offline_text} ({success_time_str})"
              api_color = self._get_color("status_error_text")
         elif api_status is None and last_success_time is None:
-             api_text = "API: Pending" # Initial state before first fetch
+             api_text = f"{api_label}: {pending_text}"
              api_color = self._get_color("status_text")
         elif api_status is None and last_success_time is not None:
-             api_text = f"API: OK ({success_time_str})" # Assume OK if time exists but status is None
+             api_text = f"{api_label}: {ok_text} ({success_time_str})"
              api_color = self._get_color("status_ok_text")
         else:
              # Catch any unexpected api_status values
-             api_text = f"API: {api_status} ({success_time_str})"
+             api_text = f"{api_label}: {api_status} ({success_time_str})"
              api_color = self._get_color("status_text")
 
-        # TODO: Add localization for API status prefixes.
         self.api_status_label.configure(text=api_text, text_color=api_color)
 
     def exit_fullscreen(self, event=None):

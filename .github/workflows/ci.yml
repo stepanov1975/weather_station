@@ -10,8 +10,12 @@ permissions:
 
 jobs:
   checks:
-    name: Tests, lint, and types
+    name: Python ${{ matrix.python-version }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11"]
 
     steps:
       - name: Check out repository
@@ -20,7 +24,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v7
         with:
-          python-version: "3.10"
+          python-version: ${{ matrix.python-version }}
           cache: "pip"
 
       - name: Install dependencies
@@ -34,3 +38,10 @@ jobs:
 
       - name: Run mypy
         run: python -m mypy weather_display
+
+      - name: Smoke-test the GUI
+        run: xvfb-run -a python -c "from weather_display.gui.app_window import AppWindow; window = AppWindow(); window.update_idletasks(); window.destroy()"
+
+      - name: Build package
+        if: matrix.python-version == '3.11'
+        run: python -m build

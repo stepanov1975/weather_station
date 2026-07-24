@@ -3,7 +3,7 @@
 import threading
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import pytest
 import requests
@@ -42,6 +42,10 @@ def _headless_controller() -> main_module.WeatherDisplayApp:
     app._update_threads = []
     app._time_update_job_id = None
     app._status_lock = threading.Lock()
+    app._stop_event = threading.Event()
+    app._current_update_lock = threading.Lock()
+    app._forecast_update_lock = threading.Lock()
+    app._connection_status_initialized = True
     app._current_api_status = None
     app._forecast_api_status = None
     app.last_connection_status = True
@@ -63,9 +67,35 @@ def test_controller_updates_gui_from_successful_current_weather_fetch() -> None:
         app._update_weather()
 
     assert app.app_window.weather == [
-        {"data": {"temperature": 27.6, "humidity": 61}, "connection_status": True, "api_status": "ok"}
+        {
+            "data": {"temperature": 27.6, "humidity": 61},
+            "connection_status": True,
+            "api_status": "ok",
+            "stale": False,
+        }
     ]
     assert app.app_window.statuses[-1][:2] == (True, "ok")
+
+
+def test_controller_keeps_last_current_weather_after_fetch_failure() -> None:
+    app = _headless_controller()
+    app.ims_weather = SimpleNamespace(
+        fetch_data=Mock(side_effect=[True, False]),
+        get_all_measurements=Mock(
+            return_value={"TD": {"value": "27.6"}, "RH": {"value": "61"}}
+        ),
+    )
+
+    with patch("weather_display.main.config.USE_MOCK_DATA", False):
+        app._update_weather()
+        app._update_weather()
+
+    assert app.app_window.weather[-1] == {
+        "data": {"temperature": 27.6, "humidity": 61},
+        "connection_status": False,
+        "api_status": "error",
+        "stale": True,
+    }
 
 
 @pytest.mark.parametrize(
@@ -217,7 +247,10 @@ def test_window_reports_widget_and_timestamp_errors_without_gui() -> None:
 
     window.update_time("08:09")
     window.update_date("Friday, 10 July 2026")
-    with patch("weather_display.gui.app_window.datetime") as mock_datetime:
+    with (
+        patch("weather_display.gui.app_window.config.LANGUAGE", "en"),
+        patch("weather_display.gui.app_window.datetime") as mock_datetime,
+    ):
         mock_datetime.fromtimestamp.side_effect = ValueError("bad")
         window.update_status_indicators(True, "error", 1.0)
 
@@ -375,11 +408,17 @@ def test_controller_forecast_handles_headless_cache_and_errors() -> None:
     app.headless = True
     app.ims_forecast = SimpleNamespace(
         get_forecast=Mock(
-            return_value={"api_status": "ok", "connection_status": True, "cache_hit": True, "data": []}
+            return_value={
+                "api_status": "ok",
+                "connection_status": True,
+                "cache_hit": True,
+                "cache_timestamp": 456.0,
+                "data": [],
+            }
         )
     )
     app._update_forecast_data(force_refresh=False)
-    assert app.last_forecast_success_time is None
+    assert app.last_forecast_success_time == 456.0
 
     app.ims_forecast.get_forecast.side_effect = RuntimeError("offline")
     app._update_forecast_data()
@@ -389,12 +428,11 @@ def test_controller_forecast_handles_headless_cache_and_errors() -> None:
 def test_controller_sleep_and_status_validation_cover_stop_boundaries() -> None:
     app = _headless_controller()
     app.running = True
-    with patch("weather_display.main.time.sleep") as sleep:
-        assert app._sleep_until_stop(2) is True
-    assert sleep.call_count == 2
+    assert app._sleep_until_stop(0) is True
 
-    app.running = False
-    assert app._sleep_until_stop(1) is False
+    app._stop_event.set()
+    with patch("weather_display.main.time.sleep", side_effect=AssertionError("polling sleep used")):
+        assert app._sleep_until_stop(60) is False
     with pytest.raises(ValueError, match="Unknown API"):
         app._record_api_status("other", "ok")
 
@@ -429,10 +467,9 @@ def test_controller_stop_cancels_updates_joins_threads_and_destroys_window() -> 
     app.app_window.winfo_exists.return_value = True
     window = app.app_window
 
-    with patch("weather_display.main.time.sleep") as sleep:
-        app.stop()
+    app.stop()
 
-    sleep.assert_called_once_with(0.5)
+    assert app._stop_event.is_set()
     window.after_cancel.assert_called_once_with("time-update")
     assert thread.joined is True
     window.destroy.assert_called_once_with()
@@ -474,7 +511,7 @@ def test_controller_shutdown_logs_widget_and_thread_failures_without_raising() -
     assert app.app_window is not None
 
 
-def test_controller_start_runs_gui_initial_updates_then_stops_after_mainloop() -> None:
+def test_controller_start_schedules_gui_initial_updates_without_fetching_inline() -> None:
     app = _headless_controller()
     app.running = False
     app.ims_weather = object()
@@ -484,19 +521,26 @@ def test_controller_start_runs_gui_initial_updates_then_stops_after_mainloop() -
     app._update_time_and_date = Mock()
     app._update_weather = Mock()
     app._initial_forecast_update = Mock()
+    app._start_one_off_update = Mock()
     app.stop = Mock()
 
-    app.start()
+    with patch("weather_display.main.signal.signal") as register_signal:
+        app.start()
 
     app._start_update_threads.assert_called_once_with()
     app._update_time_and_date.assert_called_once_with()
-    app._update_weather.assert_called_once_with()
-    app._initial_forecast_update.assert_called_once_with()
+    app._update_weather.assert_not_called()
+    app._initial_forecast_update.assert_not_called()
+    assert app._start_one_off_update.call_args_list == [
+        call(app._update_weather, "IMSInitialUpdate"),
+        call(app._initial_forecast_update, "IMSForecastInitialUpdate"),
+    ]
+    assert register_signal.call_count == 2
     app.app_window.mainloop.assert_called_once_with()
     app.stop.assert_called_once_with()
 
 
-def test_controller_start_headlessly_retries_interrupted_sleep_until_stopped() -> None:
+def test_controller_start_headlessly_launches_initial_updates_in_workers() -> None:
     app = _headless_controller()
     app.headless = True
     app.app_window = None
@@ -506,22 +550,19 @@ def test_controller_start_headlessly_retries_interrupted_sleep_until_stopped() -
     app._start_update_threads = Mock()
     app._update_weather = Mock()
     app._initial_forecast_update = Mock()
-
-    def interrupt_then_stop(_seconds: int) -> None:
-        if not hasattr(interrupt_then_stop, "interrupted"):
-            interrupt_then_stop.interrupted = True  # type: ignore[attr-defined]
-            raise InterruptedError
-        app.running = False
+    app._start_one_off_update = Mock()
+    app._sleep_until_stop = Mock(side_effect=lambda _seconds: False)
 
     with (
         patch("weather_display.main.signal.signal") as register_signal,
-        patch("weather_display.main.time.sleep", side_effect=interrupt_then_stop),
+        patch("weather_display.main.time.sleep", side_effect=lambda _seconds: setattr(app, "running", False)),
     ):
         app.start()
 
     assert register_signal.call_count == 2
-    app._update_weather.assert_called_once_with()
-    app._initial_forecast_update.assert_called_once_with()
+    app._update_weather.assert_not_called()
+    app._initial_forecast_update.assert_not_called()
+    assert app._start_one_off_update.call_count == 2
 
 
 def test_controller_start_stops_invalid_non_gui_non_headless_state() -> None:
@@ -545,6 +586,45 @@ def test_controller_connection_monitor_recovers_after_a_check_error() -> None:
         app._connection_monitoring_loop()
 
     app._sleep_until_stop.assert_called_once_with(30)
+
+
+def test_controller_first_connection_check_does_not_duplicate_initial_updates() -> None:
+    app = _headless_controller()
+    app.last_connection_status = False
+    app._connection_status_initialized = False
+    app.ims_weather = None
+    app.ims_forecast = None
+    app._start_one_off_update = Mock()
+
+    def stop_after_check(_seconds: int) -> bool:
+        app.running = False
+        return False
+
+    app._sleep_until_stop = Mock(side_effect=stop_after_check)
+
+    with patch("weather_display.main.check_internet_connection", return_value=True):
+        app._connection_monitoring_loop()
+
+    assert app.last_connection_status is True
+    app._start_one_off_update.assert_not_called()
+
+
+def test_controller_skips_overlapping_source_updates() -> None:
+    app = _headless_controller()
+    app.ims_weather = SimpleNamespace(fetch_data=Mock())
+    app.ims_forecast = SimpleNamespace(get_forecast=Mock())
+
+    app._current_update_lock.acquire()
+    app._forecast_update_lock.acquire()
+    try:
+        app._update_weather()
+        app._update_forecast_data()
+    finally:
+        app._current_update_lock.release()
+        app._forecast_update_lock.release()
+
+    app.ims_weather.fetch_data.assert_not_called()
+    app.ims_forecast.get_forecast.assert_not_called()
 
 
 def test_controller_starts_only_connection_monitor_when_ims_clients_are_unavailable() -> None:

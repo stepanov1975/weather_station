@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -32,7 +33,13 @@ class JsonCache:
         self.timestamp = time.time()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         cache_data = {"timestamp": self.timestamp, "payload": payload}
-        self.path.write_text(json.dumps(cache_data), encoding="utf-8")
+        temp_path = self.path.with_suffix(f"{self.path.suffix}.tmp")
+        temp_path.write_text(json.dumps(cache_data), encoding="utf-8")
+        try:
+            os.replace(temp_path, self.path)
+        except OSError:
+            temp_path.unlink(missing_ok=True)
+            raise
 
     def load(self) -> None:
         if not self.path.exists():

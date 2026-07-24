@@ -54,6 +54,7 @@ class IMSLastHourWeather:
     """
 
     IMS_URL: str = "https://ims.gov.il/sites/default/files/ims_data/xml_files/imslasthour.xml"
+    REQUEST_TIMEOUT = (3, 10)
     # DEBUG flag is removed in favor of standard logging levels
     # DEBUG = True
 
@@ -113,7 +114,7 @@ class IMSLastHourWeather:
             else:
                 logger.info(f"Fetching IMS data from URL: {self.IMS_URL}")
                 # Fetch data from the live URL with a timeout
-                response = requests.get(self.IMS_URL, timeout=30) # 30-second timeout
+                response = requests.get(self.IMS_URL, timeout=self.REQUEST_TIMEOUT)
                 response.raise_for_status() # Raise HTTPError for bad responses (4xx or 5xx)
                 logger.debug(f"IMS data fetched successfully (Status: {response.status_code}).")
                 # Parse the XML content from the response
@@ -350,9 +351,14 @@ class IMSLastHourWeather:
             if "raw" in time_data:
                 try:
                     # Use fromisoformat for robust parsing
-                    dt_naive = datetime.datetime.fromisoformat(time_data["raw"])
-                    # Assume the naive datetime from IMS is UTC
-                    utc_dt = pytz.utc.localize(dt_naive)
+                    raw_time = time_data["raw"]
+                    if raw_time.endswith("Z"):
+                        raw_time = f"{raw_time[:-1]}+00:00"
+                    parsed_time = datetime.datetime.fromisoformat(raw_time)
+                    if parsed_time.tzinfo is None:
+                        utc_dt = pytz.utc.localize(parsed_time)
+                    else:
+                        utc_dt = parsed_time.astimezone(pytz.utc)
                     logger.debug(f"  Parsed raw timestamp '{time_data['raw']}' as UTC: {utc_dt}")
                 except (ValueError, TypeError) as e:
                     logger.warning(f"  Could not parse raw timestamp '{time_data['raw']}' as ISO: {e}. Trying components.")
@@ -587,7 +593,7 @@ class IMSLastHourWeather:
                 tree = ET.parse(local_file_path)
                 root = tree.getroot()
             else:
-                response = requests.get(cls.IMS_URL, timeout=30)
+                response = requests.get(cls.IMS_URL, timeout=cls.REQUEST_TIMEOUT)
                 response.raise_for_status()
                 root = ET.fromstring(response.content)
 

@@ -67,14 +67,15 @@ def test_update_time_and_date_fall_back_to_raw_values_on_malformed_input() -> No
     assert window.month_year_label.values["text"] == ""
 
 
-def test_update_current_weather_uses_not_available_for_absent_values() -> None:
+def test_update_current_weather_keeps_existing_values_when_data_is_empty() -> None:
     window = _window_with_labels()
+    window.temp_value.configure(text="24°C")
+    window.humidity_value.configure(text="60%")
 
     window.update_current_weather({"data": {}})
 
-    not_available = get_translation("not_available", config.LANGUAGE)
-    assert window.temp_value.values["text"] == not_available
-    assert window.humidity_value.values["text"] == not_available
+    assert window.temp_value.values["text"] == "24°C"
+    assert window.humidity_value.values["text"] == "60%"
 
 
 def test_update_forecast_displays_loaded_icon() -> None:
@@ -180,12 +181,29 @@ def test_update_status_indicators_formats_api_statuses(
 ) -> None:
     window = _window_with_labels()
 
-    with patch("weather_display.gui.app_window.datetime") as mock_datetime:
+    with (
+        patch("weather_display.gui.app_window.config.LANGUAGE", "en"),
+        patch("weather_display.gui.app_window.datetime") as mock_datetime,
+    ):
         mock_datetime.fromtimestamp.return_value.strftime.return_value = "08:09"
         window.update_status_indicators(connection_status, api_status, last_success_time)
 
     assert window.network_status_label.values["text"] == expected_network
     assert window.api_status_label.values["text"] == expected_api
+
+
+def test_update_status_indicators_localizes_russian_text() -> None:
+    window = _window_with_labels()
+
+    with (
+        patch("weather_display.gui.app_window.config.LANGUAGE", "ru"),
+        patch("weather_display.gui.app_window.datetime") as mock_datetime,
+    ):
+        mock_datetime.fromtimestamp.return_value.strftime.return_value = "08:09"
+        window.update_status_indicators(False, "error", 1.0)
+
+    assert window.network_status_label.values["text"] == "Сеть: Офлайн"
+    assert window.api_status_label.values["text"] == "API: Ошибка (08:09)"
 
 
 def test_update_status_indicators_leaves_widgets_unchanged_when_bar_is_disabled() -> None:

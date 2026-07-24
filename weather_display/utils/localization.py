@@ -56,6 +56,13 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'unknown': 'Unknown', # General unknown value fallback
         'no_internet': 'No Internet Connection',
         'api_error': 'API Error', # General API error status
+        'network_status': 'Network',
+        'api_status': 'API',
+        'status_ok': 'OK',
+        'status_offline': 'Offline',
+        'status_error': 'Error',
+        'status_mock': 'Mock',
+        'status_pending': 'Pending',
 
         # Day Names (Full) - Used by date formatting functions
         'monday': 'Monday',
@@ -119,6 +126,16 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'windy': 'Windy',
         'muggy': 'Muggy',
         'hazy_moonlight': 'Hazy Moonlight',
+        'sandstorms': 'Sandstorms',
+        'dust': 'Dust',
+        'frost': 'Frost',
+        'stormy': 'Stormy',
+        'rainy': 'Rainy',
+        'cloudy_possible_rain': 'Cloudy, Possible Rain',
+        'partly_cloudy_possible_rain': 'Partly Cloudy, Possible Rain',
+        'cloudy_light_rain': 'Cloudy, Light Rain',
+        'extremely_hot': 'Extremely Hot',
+        'extremely_cold': 'Extremely Cold',
         # Add night variations if needed, or handle day/night logic elsewhere
         # e.g., 'partly_cloudy_night': 'Partly Cloudy Night'
     },
@@ -140,6 +157,13 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'unknown': 'Неизвестно',
         'no_internet': 'Нет подключения к Интернету',
         'api_error': 'Ошибка API',
+        'network_status': 'Сеть',
+        'api_status': 'API',
+        'status_ok': 'OK',
+        'status_offline': 'Офлайн',
+        'status_error': 'Ошибка',
+        'status_mock': 'Тест',
+        'status_pending': 'Ожидание',
 
         # Day Names (Full)
         'monday': 'Понедельник',
@@ -201,6 +225,16 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'windy': 'Ветрено',
         'muggy': 'Душно',
         'hazy_moonlight': 'Луна в дымке',
+        'sandstorms': 'Песчаные бури',
+        'dust': 'Пыль',
+        'frost': 'Мороз',
+        'stormy': 'Шторм',
+        'rainy': 'Дождливо',
+        'cloudy_possible_rain': 'Облачно, возможен дождь',
+        'partly_cloudy_possible_rain': 'Переменная облачность, возможен дождь',
+        'cloudy_light_rain': 'Облачно, небольшой дождь',
+        'extremely_hot': 'Очень жарко',
+        'extremely_cold': 'Очень холодно',
     }
     # Add other languages here...
 }
@@ -308,6 +342,17 @@ def get_translation(key: str, language: str = 'en') -> str:
 # a simple substring check, which might need refinement for more complex conditions.
 # Keys should be lowercase for consistent matching.
 WEATHER_CONDITION_MAP: Dict[str, str] = {
+    # Official IMS city portal phrases
+    'partly cloudy, possible rain': 'partly_cloudy_possible_rain',
+    'cloudy, possible rain': 'cloudy_possible_rain',
+    'cloudy, light rain': 'cloudy_light_rain',
+    'extremely hot': 'extremely_hot',
+    'extremely cold': 'extremely_cold',
+    'sandstorms': 'sandstorms',
+    'stormy': 'stormy',
+    'rainy': 'rainy',
+    'frost': 'frost',
+    'dust': 'dust',
     # General
     'sunny': 'sunny',
     'partly cloudy': 'partly_cloudy', # Covers "Partly cloudy" and variations
@@ -512,4 +557,3 @@ def get_day_name_localized(date_str: Optional[str], language: str = 'en') -> str
         # Log error if the date string cannot be parsed
         logger.error(f"Could not parse date string '{date_str}' to determine day name: {e}")
         return get_translation('unknown', language)
-

@@ -1,4 +1,5 @@
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import patch
 
 import requests
@@ -106,6 +107,32 @@ def test_station_network_error_returns_false_without_data() -> None:
         assert not weather.fetch_data()
 
     assert weather.get_all_data() is None
+
+
+def test_station_request_uses_short_connect_and_read_timeouts() -> None:
+    weather = IMSLastHourWeather("En Hahoresh")
+    response = SimpleNamespace(
+        content=b"<ims></ims>",
+        raise_for_status=lambda: None,
+        status_code=200,
+    )
+
+    with patch("weather_display.services.ims_lasthour.requests.get", return_value=response) as get:
+        weather.fetch_data()
+
+    get.assert_called_once_with(weather.IMS_URL, timeout=(3, 10))
+
+
+def test_observation_time_accepts_offset_and_zulu_timestamps() -> None:
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    offset_time = weather._convert_to_israel_time({"raw": "2026-07-24T12:00:00+00:00"})
+    zulu_time = weather._convert_to_israel_time({"raw": "2026-07-24T12:00:00Z"})
+
+    assert offset_time["Hour"] == "15"
+    assert zulu_time["Hour"] == "15"
+    assert "Conversion_Error" not in offset_time
+    assert "Conversion_Error" not in zulu_time
 
 
 def test_empty_accessors_return_empty_or_none_before_fetching() -> None:

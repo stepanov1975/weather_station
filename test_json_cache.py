@@ -1,6 +1,9 @@
 import json
 import time
 from pathlib import Path
+from unittest.mock import patch
+
+import pytest
 
 from weather_display.services.json_cache import JsonCache
 
@@ -66,3 +69,17 @@ def test_json_cache_ignores_non_object_json(tmp_path: Path) -> None:
     assert cache.payload is None
     assert cache.timestamp is None
     assert not cache.is_valid(max_age_seconds=60)
+
+
+def test_json_cache_keeps_previous_file_when_atomic_replace_fails(tmp_path: Path) -> None:
+    cache_path = tmp_path / "forecast.json"
+    cache = JsonCache(cache_path)
+    cache.store({"data": {"title": "old"}})
+
+    with (
+        patch("weather_display.services.json_cache.os.replace", side_effect=OSError("replace failed")),
+        pytest.raises(OSError, match="replace failed"),
+    ):
+        cache.store({"data": {"title": "new"}})
+
+    assert JsonCache(cache_path).payload == {"data": {"title": "old"}}

@@ -19,27 +19,32 @@ Service last-hour XML feed and Hadera forecasts from the IMS city portal:
 * Raspberry Pi OS or another Linux desktop environment.
 * Python 3.10+.
 * Internet connection for live IMS data.
-* Python dependencies from `requirements.txt`.
+* Python dependencies from `requirements-lock.txt`.
 
 Install dependencies:
 
 ```bash
 python3 -m venv weather_venv
 source weather_venv/bin/activate
-pip install -r requirements.txt
+python -m pip install -r requirements-lock.txt
 ```
+
+`requirements-lock.txt` pins the tested runtime environment for Raspberry Pi
+reinstalls. Use `requirements.txt` when intentionally updating dependencies.
 
 ## Development
 
 Use the repository virtual environment for local checks:
 
 ```bash
+./weather_venv/bin/python -m pip install -r requirements-dev.txt
 ./weather_venv/bin/python -m pytest
 ./weather_venv/bin/python -m ruff check .
 ./weather_venv/bin/python -m mypy weather_display
 ```
 
-GitHub Actions runs the same checks on pushes to `main` and on pull requests.
+GitHub Actions runs the checks on Python 3.10 and 3.11, smoke-tests the GUI
+under Xvfb, and builds the package on pushes to `main` and pull requests.
 Dependabot is configured for Python dependencies and GitHub Actions.
 
 For repository security, the checked-in workflows run CodeQL, dependency
