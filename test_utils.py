@@ -1,5 +1,6 @@
 """Focused tests for utility normal, fallback, and invalid-input behavior."""
 
+import logging
 from datetime import datetime
 from unittest.mock import MagicMock, patch
 
@@ -40,6 +41,16 @@ def test_localization_falls_back_for_unknown_language_and_key() -> None:
 def test_weather_condition_handles_none_and_unmapped_text() -> None:
     assert translate_weather_condition(None, "en") == "Unknown"
     assert translate_weather_condition("Volcanic ash", "en") == "Volcanic ash"
+
+
+def test_weather_condition_translates_muggy_without_warning(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    with caplog.at_level(logging.WARNING, logger="weather_display.utils.localization"):
+        assert translate_weather_condition("Muggy", "en") == "Muggy"
+        assert translate_weather_condition("Muggy", "ru") == "Душно"
+
+    assert "No translation mapping found" not in caplog.text
 
 
 def test_day_name_localization_accepts_iso_date_and_rejects_invalid_input() -> None:

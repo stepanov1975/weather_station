@@ -117,6 +117,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'hot': 'Hot',
         'cold': 'Cold',
         'windy': 'Windy',
+        'muggy': 'Muggy',
         'hazy_moonlight': 'Hazy Moonlight',
         # Add night variations if needed, or handle day/night logic elsewhere
         # e.g., 'partly_cloudy_night': 'Partly Cloudy Night'
@@ -198,6 +199,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         'hot': 'Жарко',
         'cold': 'Холодно',
         'windy': 'Ветрено',
+        'muggy': 'Душно',
         'hazy_moonlight': 'Луна в дымке',
     }
     # Add other languages here...
@@ -317,6 +319,7 @@ WEATHER_CONDITION_MAP: Dict[str, str] = {
     'rain': 'rain', # General rain, might be overridden by more specific types
     'snow': 'snow', # General snow
     'windy': 'windy',
+    'muggy': 'muggy',
     # Rain variations
     'light rain': 'light_rain',
     'moderate rain': 'moderate_rain',
