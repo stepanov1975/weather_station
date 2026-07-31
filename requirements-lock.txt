@@ -1,6 +1,6 @@
 # Runtime dependencies for reproducible Raspberry Pi installs.
 certifi==2025.1.31
-charset-normalizer==3.4.1
+charset-normalizer==3.4.9
 customtkinter==6.0.0
 darkdetect==0.8.0
 idna==3.15
