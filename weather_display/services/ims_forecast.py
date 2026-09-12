@@ -53,6 +53,15 @@ class IMSCityForecast:
     }
 
     WEATHER_ICON_MAP: dict[str, int] = {
+        "sunny": 1,
+        "mostly sunny": 2,
+        "partly sunny": 3,
+        "intermittent clouds": 4,
+        "hazy sunshine": 5,
+        "mostly cloudy": 6,
+        "overcast": 8,
+        "dreary": 8,
+        "mist": 11,
         "clear": 1,
         "partly cloudy": 3,
         "cloudy": 7,
@@ -61,6 +70,30 @@ class IMSCityForecast:
         "light rain": 12,
         "showers": 12,
         "thunderstorm": 15,
+        "t-storms": 15,
+        "mostly cloudy with showers": 13,
+        "partly sunny with showers": 14,
+        "mostly cloudy with thunderstorms": 16,
+        "partly sunny with thunderstorms": 17,
+        "flurries": 19,
+        "mostly cloudy with flurries": 20,
+        "partly sunny with flurries": 21,
+        "mostly cloudy with snow": 23,
+        "ice": 24,
+        "freezing rain": 26,
+        "rain and snow": 29,
+        "clear (night)": 33,
+        "mostly clear (night)": 34,
+        "partly cloudy (night)": 35,
+        "intermittent clouds (night)": 36,
+        "hazy moonlight": 37,
+        "mostly cloudy (night)": 38,
+        "partly cloudy with showers (night)": 39,
+        "mostly cloudy with showers (night)": 40,
+        "partly cloudy with thunderstorms (night)": 41,
+        "mostly cloudy with thunderstorms (night)": 42,
+        "mostly cloudy with flurries (night)": 43,
+        "mostly cloudy with snow (night)": 44,
         "dust": 46,
         "sandstorms": 45,
         "hot": 30,
@@ -238,10 +271,17 @@ class IMSCityForecast:
     def _icon_code_for_condition(self, condition: str | None) -> int | None:
         if not condition:
             return None
-        condition_lower = condition.lower().strip()
+        condition_lower = " ".join(condition.lower().split())
         if condition_lower in self.WEATHER_ICON_MAP:
             return self.WEATHER_ICON_MAP[condition_lower]
-        for key in sorted(self.WEATHER_ICON_MAP, key=len, reverse=True):
+        # Preserve precipitation in mixed phrases such as "mostly cloudy with
+        # light rain", even when the sky description is the longer match.
+        precipitation = ("rain", "snow", "sleet", "flurries", "storm", "showers")
+        for key in sorted(
+            self.WEATHER_ICON_MAP,
+            key=lambda phrase: (any(term in phrase for term in precipitation), len(phrase)),
+            reverse=True,
+        ):
             if key in condition_lower:
                 return self.WEATHER_ICON_MAP[key]
         return 7

@@ -235,6 +235,68 @@ def test_all_mapped_ims_icons_are_bundled() -> None:
         assert handler.get_icon_path(icon_code) is not None
 
 
+@pytest.mark.parametrize(("condition", "expected_icon"), [
+    ("Sunny", 1),
+    ("Mostly sunny", 2),
+    ("Partly sunny", 3),
+    ("Intermittent clouds", 4),
+    ("Hazy sunshine", 5),
+    ("Mostly cloudy", 6),
+    ("Overcast", 8),
+    ("Dreary (Overcast)", 8),
+    ("Mist", 11),
+    ("Freezing rain", 26),
+    ("Rain and snow", 29),
+    ("Flurries", 19),
+    ("T-storms", 15),
+    ("Ice", 24),
+    ("Clear (Night)", 33),
+    ("Mostly clear (Night)", 34),
+    ("Partly cloudy (Night)", 35),
+    ("Intermittent clouds (Night)", 36),
+    ("Hazy moonlight", 37),
+    ("Mostly cloudy (Night)", 38),
+    ("Mostly cloudy with showers", 13),
+    ("Partly sunny with showers", 14),
+    ("Mostly cloudy with thunderstorms", 16),
+    ("Partly sunny with thunderstorms", 17),
+    ("Mostly cloudy with flurries", 20),
+    ("Partly sunny with flurries", 21),
+    ("Mostly cloudy with snow", 23),
+    ("Partly cloudy with showers (Night)", 39),
+    ("Mostly cloudy with showers (Night)", 40),
+    ("Partly cloudy with thunderstorms (Night)", 41),
+    ("Mostly cloudy with thunderstorms (Night)", 42),
+    ("Mostly cloudy with flurries (Night)", 43),
+    ("Mostly cloudy with snow (Night)", 44),
+    ("  FREEZING   RAIN nearby  ", 26),
+    ("Cloudy, light rain", 13),
+    ("Light snow showers", 49),
+    ("Mostly cloudy with light rain", 12),
+    ("Mostly cloudy, thunderstorms", 15),
+    ("Mostly sunny with rain", 18),
+])
+def test_forecast_text_fallback_preserves_condition_meaning(
+    tmp_path: Path, condition: str, expected_icon: int,
+) -> None:
+    client = IMSCityForecast(cache_path=tmp_path / "forecast.json")
+    payload = {"data": {
+        "weather_codes": {"9999": {"desc_en": condition}},
+        "forecast_data": {"2026-09-12": {"daily": {
+            "forecast_date": "2026-09-12",
+            "maximum_temperature": "20",
+            "minimum_temperature": "10",
+            "weather_code": "9999",
+        }}},
+    }}
+
+    forecast = client.parse_forecast(payload, today=date(2026, 9, 12))
+
+    assert forecast[0]["condition"] == condition
+    assert forecast[0]["icon_code"] == expected_icon
+    assert WeatherIconHandler().load_icon(forecast[0]["icon_code"]) is not None
+
+
 @pytest.mark.parametrize("bad_payload", [
     {"data": None},
     {"data": {}},
