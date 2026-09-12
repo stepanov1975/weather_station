@@ -97,7 +97,14 @@ class WeatherIconHandler:
         41: {"name": "partly_cloudy_with_t_storms_night", "description": "Partly Cloudy with Thunderstorms (Night)"},
         42: {"name": "mostly_cloudy_with_t_storms_night", "description": "Mostly Cloudy with Thunderstorms (Night)"},
         43: {"name": "mostly_cloudy_with_flurries_night", "description": "Mostly Cloudy with Flurries (Night)"},
-        44: {"name": "mostly_cloudy_with_snow_night", "description": "Mostly Cloudy with Snow (Night)"}
+        44: {"name": "mostly_cloudy_with_snow_night", "description": "Mostly Cloudy with Snow (Night)"},
+        45: {"name": "sandstorms", "description": "Sandstorms"},
+        46: {"name": "dust", "description": "Dust"},
+        47: {"name": "muggy", "description": "Muggy"},
+        48: {"name": "frost", "description": "Frost"},
+        49: {"name": "light_snow", "description": "Light Snow"},
+        50: {"name": "heavy_snow", "description": "Heavy Snow"},
+        51: {"name": "stormy", "description": "Stormy"},
     }
 
     def __init__(self) -> None:
@@ -120,7 +127,7 @@ class WeatherIconHandler:
         bundled local asset directory.
 
         Args:
-            icon_code (Optional[int]): The numeric weather icon code (1-44), or None.
+            icon_code (Optional[int]): A known internal weather icon code, or None.
 
         Returns:
             Optional[str]: The absolute path to the local icon file (.png) if it exists.
@@ -228,7 +235,7 @@ class WeatherIconHandler:
         4. Returns the `CTkImage`.
 
         Args:
-            icon_code (Optional[int]): The numeric weather icon code (1-44), or None
+            icon_code (Optional[int]): A known internal weather icon code, or None
                                        (will trigger default icon logic).
             size (Tuple[int, int]): The desired (width, height) tuple for the icon image.
                                     Defaults to (64, 64).

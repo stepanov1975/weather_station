@@ -26,10 +26,10 @@ class IMSCityForecast:
     BASE_URL = "https://ims.gov.il/en/city_portal/{location_id}"
 
     IMS_ICON_CODE_MAP: dict[str, int] = {
-        "1010": 5,   # Sandstorms
+        "1010": 45,  # Sandstorms
         "1020": 15,  # Thunderstorms
         "1060": 22,  # Snow
-        "1070": 22,  # Light snow
+        "1070": 49,  # Light snow
         "1080": 25,  # Sleet
         "1140": 18,  # Rainy
         "1160": 11,  # Fog
@@ -37,16 +37,16 @@ class IMSCityForecast:
         "1230": 7,   # Cloudy
         "1250": 1,   # Clear
         "1260": 32,  # Windy
-        "1270": 30,  # Muggy
-        "1300": 24,  # Frost
+        "1270": 47,  # Muggy
+        "1300": 48,  # Frost
         "1310": 30,  # Hot
         "1320": 31,  # Cold
-        "1510": 15,  # Stormy
-        "1520": 22,  # Heavy snow
+        "1510": 51,  # Stormy
+        "1520": 50,  # Heavy snow
         "1530": 14,  # Partly cloudy, possible rain
         "1540": 13,  # Cloudy, possible rain
         "1560": 13,  # Cloudy, light rain
-        "1570": 5,   # Dust
+        "1570": 46,  # Dust
         "1580": 30,  # Extremely hot
         "1590": 31,  # Extremely cold
     }
@@ -60,8 +60,8 @@ class IMSCityForecast:
         "light rain": 12,
         "showers": 12,
         "thunderstorm": 15,
-        "dust": 5,
-        "sandstorms": 5,
+        "dust": 46,
+        "sandstorms": 45,
         "hot": 30,
         "extremely hot": 30,
         "cold": 31,
@@ -69,9 +69,11 @@ class IMSCityForecast:
         "snow": 22,
         "sleet": 25,
         "windy": 32,
-        "muggy": 30,
-        "frost": 24,
-        "stormy": 15,
+        "muggy": 47,
+        "frost": 48,
+        "stormy": 51,
+        "light snow": 49,
+        "heavy snow": 50,
         "partly cloudy, possible rain": 14,
         "cloudy, possible rain": 13,
         "cloudy, light rain": 13,

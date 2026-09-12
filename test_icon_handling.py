@@ -95,7 +95,8 @@ class TestWeatherIconHandler(unittest.TestCase):
             # Set up our mocks
             mock_get_path.return_value = "fake_path.png"
             mock_exists.return_value = True  # Mock that the file exists
-            mock_pil_open.return_value = "fake_pil_image"
+            mock_pil_open.return_value.width = 75
+            mock_pil_open.return_value.height = 45
             mock_ctk_image.return_value = "fake_ctk_image"
             
             # Test loading an icon

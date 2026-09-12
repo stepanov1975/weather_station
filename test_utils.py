@@ -117,7 +117,7 @@ def test_load_image_returns_none_for_missing_or_corrupt_file() -> None:
         assert load_image("corrupt.png") is None
 
 
-def test_load_image_wraps_image_with_requested_size() -> None:
+def test_load_image_preserves_aspect_ratio_within_requested_size() -> None:
     image = MagicMock(width=20, height=10)
     rendered_image = object()
     with (
@@ -127,7 +127,7 @@ def test_load_image_wraps_image_with_requested_size() -> None:
     ):
         assert load_image("icon.png", (32, 32)) is rendered_image
 
-    ctk_image.assert_called_once_with(light_image=image, dark_image=image, size=(32, 32))
+    ctk_image.assert_called_once_with(light_image=image, dark_image=image, size=(32, 16))
 
 
 @pytest.mark.parametrize(

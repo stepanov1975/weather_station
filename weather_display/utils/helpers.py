@@ -68,11 +68,11 @@ def load_image(path: str, size: Optional[Tuple[int, int]] = None) -> Optional[ct
 
     Args:
         path (str): The absolute or relative file path to the image file.
-        size (Optional[Tuple[int, int]]): An optional tuple specifying the desired
+        size (Optional[Tuple[int, int]]): An optional tuple specifying the maximum
                                           (width, height) in pixels. If provided,
-                                          the image will be resized accordingly by
-                                          CTkImage. If None, the image's original
-                                          dimensions are used.
+                                          the image is scaled to fit those bounds
+                                          without changing its aspect ratio. If None,
+                                          the image's original dimensions are used.
 
     Returns:
         Optional[ctk.CTkImage]: A CTkImage object ready for use in a CustomTkinter
@@ -88,8 +88,15 @@ def load_image(path: str, size: Optional[Tuple[int, int]] = None) -> Optional[ct
         # Open the image using Pillow (PIL)
         img_pil = Image.open(path)
 
-        # Determine the size for CTkImage
-        target_size = size if size else (img_pil.width, img_pil.height)
+        # Fit the image inside the requested bounds without distorting it.
+        if size:
+            scale = min(size[0] / img_pil.width, size[1] / img_pil.height)
+            target_size = (
+                max(1, round(img_pil.width * scale)),
+                max(1, round(img_pil.height * scale)),
+            )
+        else:
+            target_size = (img_pil.width, img_pil.height)
 
         # Create the CTkImage object.
         # For simplicity, we use the same PIL image for both light and dark modes.

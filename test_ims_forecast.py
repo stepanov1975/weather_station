@@ -10,6 +10,7 @@ from unittest.mock import Mock, patch
 import requests
 
 from weather_display.services.ims_forecast import IMSCityForecast
+from weather_display.utils.icon_handler import WeatherIconHandler
 
 
 class TestIMSCityForecast(unittest.TestCase):
@@ -204,4 +205,28 @@ def test_real_ims_weather_codes_use_specific_bundled_icons() -> None:
         today=date(2026, 7, 24),
     )
 
-    assert [day["icon_code"] for day in forecast] == [25, 32, 30, 24, 15, 14, 13, 13]
+    assert [day["icon_code"] for day in forecast] == [25, 32, 47, 48, 51, 14, 13, 13]
+
+
+def test_distinct_ims_conditions_use_semantically_matching_icons() -> None:
+    expected_icon_names = {
+        "1010": "sandstorms",
+        "1070": "light_snow",
+        "1270": "muggy",
+        "1300": "frost",
+        "1510": "stormy",
+        "1520": "heavy_snow",
+        "1570": "dust",
+    }
+
+    for weather_code, expected_name in expected_icon_names.items():
+        icon_code = IMSCityForecast.IMS_ICON_CODE_MAP[weather_code]
+        assert WeatherIconHandler.ICON_MAPPING[icon_code]["name"] == expected_name
+
+
+def test_all_mapped_ims_icons_are_bundled() -> None:
+    handler = WeatherIconHandler()
+
+    for icon_code in IMSCityForecast.IMS_ICON_CODE_MAP.values():
+        assert icon_code in handler.ICON_MAPPING
+        assert handler.get_icon_path(icon_code) is not None

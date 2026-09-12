@@ -99,7 +99,9 @@ class WeatherIconsDemo(ctk.CTk):
         row, col = 0, 0
 
         # Separate icon codes into day and night groups based on the local icon mapping.
-        day_icons = sorted([code for code in self.icon_handler.ICON_MAPPING if 1 <= code <= 32])
+        day_icons = sorted(
+            [code for code in self.icon_handler.ICON_MAPPING if not 33 <= code <= 44]
+        )
         night_icons = sorted([code for code in self.icon_handler.ICON_MAPPING if 33 <= code <= 44])
 
         # --- Day Icons Section ---

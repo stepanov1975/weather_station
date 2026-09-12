@@ -146,7 +146,7 @@ TEXT_PADDING = {"padx": 5, "pady": 2}
 ELEMENT_MARGINS = {"padx": 5, "pady": 5}
 
 # --- Sizes (in pixels) ---
-# Dimensions (width, height) for the weather icons displayed in the forecast.
+# Maximum dimensions (width, height) for weather icons displayed in the forecast.
 FORECAST_ICON_SIZE = (96, 96)
 # Height of the top frame used to display connection and API status indicators.
 CONNECTION_FRAME_HEIGHT = 30
