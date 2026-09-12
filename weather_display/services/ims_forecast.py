@@ -7,6 +7,7 @@ the existing weather display GUI.
 """
 
 import logging
+import math
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Any
@@ -88,7 +89,17 @@ class IMSCityForecast:
         self.location_id = location_id
         self.timeout_seconds = timeout_seconds
         self.url = self.BASE_URL.format(location_id=location_id)
-        self.cache = JsonCache(cache_path or config.IMS_FORECAST_CACHE_PATH)
+        default_cache_path = config.IMS_FORECAST_CACHE_PATH
+        self.cache = JsonCache(cache_path or default_cache_path.with_name(
+            f"{default_cache_path.stem}_{location_id}{default_cache_path.suffix}"
+        ))
+        if self.cache.payload is not None:
+            try:
+                self._validate_payload(self.cache.payload)
+            except ValueError as exc:
+                logger.warning("Ignoring invalid forecast cache %s: %s", self.cache.path, exc)
+                self.cache.payload = None
+                self.cache.timestamp = None
         self._connection_status: bool | None = False
         logger.info("IMSCityForecast initialized for location id %s", location_id)
 
@@ -122,6 +133,7 @@ class IMSCityForecast:
 
         try:
             payload = self._request_payload()
+            self._validate_payload(payload)
             try:
                 self.cache.store(payload)
             except OSError as exc:
@@ -189,6 +201,23 @@ class IMSCityForecast:
                 break
 
         return parsed_days
+
+    def _validate_payload(self, payload: dict[str, Any]) -> None:
+        """Require a renderable forecast before replacing the last good cache."""
+        try:
+            forecast_count = len(payload["data"]["forecast_data"])
+            forecast = self.parse_forecast(payload, days=forecast_count, today=date.min)
+            if not forecast:
+                raise ValueError("No daily forecasts")
+            for day in forecast:
+                date.fromisoformat(day["date"])
+                if day["condition"] is not None and not isinstance(day["condition"], str):
+                    raise ValueError("Invalid weather condition")
+                for key in ("max_temp", "min_temp"):
+                    if day[key] is not None and not math.isfinite(day[key]):
+                        raise ValueError("Non-finite forecast temperature")
+        except (AttributeError, KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"Invalid IMS forecast payload: {exc}") from exc
 
     def _request_payload(self) -> dict[str, Any]:
         logger.info("Fetching IMS city forecast from %s", self.url)

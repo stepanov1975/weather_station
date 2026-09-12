@@ -46,7 +46,7 @@ class JsonCache:
             return
         try:
             cache_data = json.loads(self.path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             logger.warning("Ignoring unreadable cache file %s: %s", self.path, exc)
             return
 
