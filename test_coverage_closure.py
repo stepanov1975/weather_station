@@ -115,18 +115,19 @@ def _station_response(time_obs: str, measurements: str) -> Mock:
     ("2020-01-01T00:00:00Z", "error"),
     ("", "error"),
     ("invalid", "error"),
-    ("2026-09-12T11:00:00Z", "error"),
-    ("2026-09-12T08:49:59Z", "error"),
-    ("2026-09-12T08:50:00Z", "ok"),
-    ("2026-09-12T09:50:00", "ok"),
-    ("2026-09-12T09:50:00Z", "ok"),
-    ("2026-09-12T12:50:00+03:00", "ok"),
+    ("2026-11-13T10:25:00Z", "error"),
+    ("2026-11-13T08:14:59Z", "error"),
+    ("2026-11-13T08:15:00Z", "ok"),
+    ("2026-11-13T10:50:00", "ok"),
+    ("2026-11-13T10:14:59", "error"),
+    ("2026-11-13T08:50:00Z", "ok"),
+    ("2026-11-13T11:50:00+03:00", "ok"),
 ])
 def test_controller_checks_source_observation_age(time_obs: str, expected_status: str) -> None:
     app = _headless_controller()
     app.ims_weather = IMSLastHourWeather("En Hahoresh")
     response = _station_response(time_obs, "<TD>27.6</TD><RH>61</RH>")
-    now = datetime(2026, 9, 12, 10, tzinfo=timezone.utc).timestamp()
+    now = datetime(2026, 11, 13, 9, 25, tzinfo=timezone.utc).timestamp()
     with (
         patch("weather_display.services.ims_lasthour.requests.get", return_value=response),
         patch("weather_display.main.time.time", return_value=now),
@@ -302,11 +303,11 @@ def test_ims_time_conversion_constructs_components_and_returns_errors() -> None:
     )
     failed = weather._convert_to_israel_time({"Year": "0"})
 
-    assert converted["Hour"] == "11"
+    assert converted["Hour"] == "09"
     assert "Conversion_Error" in failed
 
 
-def test_ims_accessors_fall_back_to_utc_time_when_converted_time_is_absent() -> None:
+def test_ims_accessors_fall_back_to_source_time_when_converted_time_is_absent() -> None:
     weather = IMSLastHourWeather("En Hahoresh")
     weather.data = {"metadata": {}, "measurements": {}, "time": {"raw": "2026-07-10T08:00:00"}}
 

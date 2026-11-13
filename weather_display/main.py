@@ -33,7 +33,6 @@ import threading
 import argparse
 import signal
 import math
-from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 # Local application imports
@@ -42,7 +41,7 @@ try:
     from weather_display import config
     from weather_display.gui.app_window import AppWindow
     from weather_display.services.time_service import TimeService
-    from weather_display.services.ims_lasthour import IMSLastHourWeather
+    from weather_display.services.ims_lasthour import IMSLastHourWeather, parse_observation_time
     from weather_display.services.ims_forecast import IMSCityForecast
     from weather_display.utils.helpers import check_internet_connection
 except ImportError as e:
@@ -57,7 +56,7 @@ except ImportError as e:
         from weather_display import config
         from weather_display.gui.app_window import AppWindow
         from weather_display.services.time_service import TimeService
-        from weather_display.services.ims_lasthour import IMSLastHourWeather
+        from weather_display.services.ims_lasthour import IMSLastHourWeather, parse_observation_time
         from weather_display.services.ims_forecast import IMSCityForecast
         from weather_display.utils.helpers import check_internet_connection
     except ImportError:
@@ -676,11 +675,7 @@ class WeatherDisplayApp:
 
                     observation_time = self.ims_weather.get_observation_time(israel_time=False) or {}
                     try:
-                        observed_at = datetime.fromisoformat(
-                            observation_time.get("raw", "").replace("Z", "+00:00")
-                        )
-                        if observed_at.tzinfo is None:
-                            observed_at = observed_at.replace(tzinfo=timezone.utc)
+                        observed_at = parse_observation_time(observation_time.get("raw", ""))
                         age_seconds = time.time() - observed_at.timestamp()
                         # Allow one polling interval for feed delay and clock skew.
                         grace_seconds = config.IMS_UPDATE_INTERVAL_MINUTES * 60

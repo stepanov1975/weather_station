@@ -36,6 +36,23 @@ def test_fetch_selects_latest_station_reading(
     assert weather.get_observation_time(israel_time=False)["raw"] == readings[2][0]
 
 
+def test_fetch_compares_station_timestamps_with_and_without_offsets(tmp_path: Path) -> None:
+    xml_path = tmp_path / "imslasthour.xml"
+    xml_path.write_text(
+        """<ims>
+  <Observation><stn_name>EN HAHORESH</stn_name>
+    <time_obs>2026-11-13T10:40:00</time_obs><TD>26.6</TD></Observation>
+  <Observation><stn_name>EN HAHORESH</stn_name>
+    <time_obs>2026-11-13T08:50:00Z</time_obs><TD>27</TD></Observation>
+</ims>""",
+        encoding="utf-8",
+    )
+    weather = IMSLastHourWeather("En Hahoresh")
+
+    assert weather.fetch_data(use_local_file=True, local_file_path=str(xml_path))
+    assert weather.get_measurement("TD")["value"] == "27"
+
+
 @pytest.mark.parametrize("station_name", ["en hahoresh", "hahoresh"])
 @pytest.mark.parametrize("unusable_time", ["", "invalid"])
 def test_latest_reading_stays_with_selected_station_and_ignores_unusable_times(
@@ -90,7 +107,7 @@ def test_fetch_data_from_local_xml_extracts_station_measurements(tmp_path: Path)
     assert weather.get_measurement("TD") == {"value": "28.4", "description": "Temperature"}
     assert weather.get_measurement("RH") == {"value": "63", "description": "Humidity"}
     assert weather.get_observation_time(israel_time=False)["raw"] == "2026-07-03T12:30:00"
-    assert weather.get_observation_time()["Hour"] == "15"
+    assert weather.get_observation_time()["Hour"] == "13"
     assert weather.get_hebrew_variables() == {"TD": "Temperature", "RH": "Humidity"}
 
 
