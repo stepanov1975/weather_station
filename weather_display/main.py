@@ -32,6 +32,8 @@ import logging.handlers
 import threading
 import argparse
 import signal
+import math
+from datetime import datetime, timezone
 from typing import Any, Callable, Optional
 
 # Local application imports
@@ -660,33 +662,47 @@ class WeatherDisplayApp:
                 connection_status = success # Fetch success implies connection worked at that moment
 
                 if success:
-                    api_status = 'ok' # Mark API as OK if fetch succeeded
-                    measurements = self.ims_weather.get_all_measurements()
-                    if measurements:
-                        # Extract relevant measurements (Temperature 'TD', Humidity 'RH')
-                        temp_data = measurements.get('TD')
-                        humidity_data = measurements.get('RH')
+                    measurements = self.ims_weather.get_all_measurements() or {}
+                    for tag, key in (("TD", "temperature"), ("RH", "humidity")):
+                        measurement = measurements.get(tag) or {}
+                        try:
+                            value = float(measurement.get("value", ""))
+                            if not math.isfinite(value):
+                                raise ValueError("Non-finite measurement")
+                        except (TypeError, ValueError):
+                            logger.warning("Missing or invalid IMS measurement: %s", tag)
+                            continue
+                        current_weather_data[key] = int(value) if tag == "RH" else value
 
-                        # Safely extract values, converting to appropriate types
-                        current_weather_data['temperature'] = float(temp_data['value']) if temp_data and temp_data.get('value') is not None else None
-                        current_weather_data['humidity'] = int(humidity_data['value']) if humidity_data and humidity_data.get('value') is not None else None
-
-                        logger.info(f"IMS Data Fetched: Temp={current_weather_data.get('temperature')}, Humidity={current_weather_data.get('humidity')}")
-
-                    else:
-                        logger.warning("IMS data fetched successfully, but no measurements found in the response.")
-                        api_status = 'error' # Treat as error if expected data is missing
+                    observation_time = self.ims_weather.get_observation_time(israel_time=False) or {}
+                    try:
+                        observed_at = datetime.fromisoformat(
+                            observation_time.get("raw", "").replace("Z", "+00:00")
+                        )
+                        if observed_at.tzinfo is None:
+                            observed_at = observed_at.replace(tzinfo=timezone.utc)
+                        age_seconds = time.time() - observed_at.timestamp()
+                        # Allow one polling interval for feed delay and clock skew.
+                        grace_seconds = config.IMS_UPDATE_INTERVAL_MINUTES * 60
+                        stale = not -grace_seconds <= age_seconds <= 3600 + grace_seconds
+                    except (TypeError, ValueError):
+                        stale = True
+                    if stale:
+                        logger.warning("IMS observation timestamp is stale or unusable: %s", observation_time)
+                    if len(current_weather_data) == 2 and not stale:
+                        api_status = 'ok'
                 else:
                     logger.error("Failed to fetch data from IMS service.")
                     # Keep api_status as 'error', connection_status is already False
 
-            if current_weather_data:
+            previous_data = getattr(self, "_last_current_weather_data", {})
+            if current_weather_data and not stale:
+                current_weather_data = {**previous_data, **current_weather_data}
                 self._last_current_weather_data = current_weather_data.copy()
-            else:
-                previous_data = getattr(self, "_last_current_weather_data", {})
-                if previous_data:
-                    current_weather_data = previous_data.copy()
-                    stale = True
+            elif previous_data:
+                current_weather_data = previous_data.copy()
+                stale = True
+            stale = stale or api_status == 'error'
 
             # Update GUI if it exists, ensuring it runs on the main thread
             if self.app_window:

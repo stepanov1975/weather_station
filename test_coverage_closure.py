@@ -1,6 +1,7 @@
 """Headless behavior tests for controller, GUI fallbacks, and IMS XML edges."""
 
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import Mock, call, patch
@@ -61,6 +62,7 @@ def test_controller_updates_gui_from_successful_current_weather_fetch() -> None:
         get_all_measurements=Mock(
             return_value={"TD": {"value": "27.6"}, "RH": {"value": "61"}}
         ),
+        get_observation_time=Mock(return_value={"raw": datetime.now(timezone.utc).isoformat()}),
     )
 
     with patch("weather_display.main.config.USE_MOCK_DATA", False):
@@ -84,6 +86,7 @@ def test_controller_keeps_last_current_weather_after_fetch_failure() -> None:
         get_all_measurements=Mock(
             return_value={"TD": {"value": "27.6"}, "RH": {"value": "61"}}
         ),
+        get_observation_time=Mock(return_value={"raw": datetime.now(timezone.utc).isoformat()}),
     )
 
     with patch("weather_display.main.config.USE_MOCK_DATA", False):
@@ -96,6 +99,100 @@ def test_controller_keeps_last_current_weather_after_fetch_failure() -> None:
         "api_status": "error",
         "stale": True,
     }
+
+
+def _station_response(time_obs: str, measurements: str) -> Mock:
+    return Mock(
+        status_code=200,
+        content=(
+            "<ims><Observation><stn_name>En Hahoresh</stn_name>"
+            f"<time_obs>{time_obs}</time_obs>{measurements}</Observation></ims>"
+        ).encode(),
+    )
+
+
+@pytest.mark.parametrize("time_obs, expected_status", [
+    ("2020-01-01T00:00:00Z", "error"),
+    ("", "error"),
+    ("invalid", "error"),
+    ("2026-09-12T11:00:00Z", "error"),
+    ("2026-09-12T08:49:59Z", "error"),
+    ("2026-09-12T08:50:00Z", "ok"),
+    ("2026-09-12T09:50:00", "ok"),
+    ("2026-09-12T09:50:00Z", "ok"),
+    ("2026-09-12T12:50:00+03:00", "ok"),
+])
+def test_controller_checks_source_observation_age(time_obs: str, expected_status: str) -> None:
+    app = _headless_controller()
+    app.ims_weather = IMSLastHourWeather("En Hahoresh")
+    response = _station_response(time_obs, "<TD>27.6</TD><RH>61</RH>")
+    now = datetime(2026, 9, 12, 10, tzinfo=timezone.utc).timestamp()
+    with (
+        patch("weather_display.services.ims_lasthour.requests.get", return_value=response),
+        patch("weather_display.main.time.time", return_value=now),
+        patch("weather_display.main.config.USE_MOCK_DATA", False),
+        patch("weather_display.main.config.IMS_UPDATE_INTERVAL_MINUTES", 10),
+    ):
+        app._update_weather()
+
+    result = app.app_window.weather[-1]
+    assert result["data"] == {"temperature": 27.6, "humidity": 61}
+    assert result["api_status"] == expected_status
+    assert result["stale"] is (expected_status == "error")
+    assert app.app_window.statuses[-1][1] == expected_status
+
+
+def test_controller_does_not_replace_good_readings_with_old_observations() -> None:
+    app = _headless_controller()
+    app.ims_weather = IMSLastHourWeather("En Hahoresh")
+    fresh = _station_response("2026-09-12T09:50:00Z", "<TD>27.6</TD><RH>61</RH>")
+    old = _station_response("2020-01-01T00:00:00Z", "<TD>10</TD><RH>20</RH>")
+    now = datetime(2026, 9, 12, 10, tzinfo=timezone.utc).timestamp()
+    with (
+        patch("weather_display.services.ims_lasthour.requests.get", side_effect=[fresh, old, fresh]),
+        patch("weather_display.main.time.time", return_value=now),
+        patch("weather_display.main.config.USE_MOCK_DATA", False),
+    ):
+        app._update_weather()
+        app._update_weather()
+        assert app.app_window.weather[-1]["data"] == {"temperature": 27.6, "humidity": 61}
+        assert app.app_window.weather[-1]["stale"] is True
+        assert app._last_current_weather_data == {"temperature": 27.6, "humidity": 61}
+        app._update_weather()
+
+    assert app.app_window.weather[-1]["stale"] is False
+    assert app.app_window.statuses[-1][1] == "ok"
+
+
+@pytest.mark.parametrize("measurements, expected_data", [
+    ("<WS>4</WS>", {"temperature": 27.6, "humidity": 61}),
+    ("<TD>28</TD>", {"temperature": 28.0, "humidity": 61}),
+    ("<RH>65</RH>", {"temperature": 27.6, "humidity": 65}),
+    ("<TD>unknown</TD><RH>65</RH>", {"temperature": 27.6, "humidity": 65}),
+    ("<TD>nan</TD><RH>65</RH>", {"temperature": 27.6, "humidity": 65}),
+    ("<TD>28</TD><RH>inf</RH>", {"temperature": 28.0, "humidity": 61}),
+])
+def test_controller_keeps_valid_values_when_observations_are_partial(
+    measurements: str, expected_data: dict[str, object]
+) -> None:
+    app = _headless_controller()
+    app.ims_weather = IMSLastHourWeather("En Hahoresh")
+    fresh = _station_response("2026-09-12T09:50:00Z", "<TD>27.6</TD><RH>61</RH>")
+    partial = _station_response("2026-09-12T09:50:00Z", measurements)
+    now = datetime(2026, 9, 12, 10, tzinfo=timezone.utc).timestamp()
+    with (
+        patch("weather_display.services.ims_lasthour.requests.get", side_effect=[fresh, partial]),
+        patch("weather_display.main.time.time", return_value=now),
+        patch("weather_display.main.config.USE_MOCK_DATA", False),
+    ):
+        app._update_weather()
+        app._update_weather()
+
+    result = app.app_window.weather[-1]
+    assert result["data"] == expected_data
+    assert result["stale"] is True
+    assert result["api_status"] == "error"
+    assert app._last_current_weather_data == expected_data
 
 
 @pytest.mark.parametrize(
@@ -683,7 +780,11 @@ def test_controller_weather_fetch_handles_empty_and_complete_measurements(
     measurements: dict[str, dict[str, str]] | None, expected_data: dict[str, object]
 ) -> None:
     app = _headless_controller()
-    app.ims_weather = SimpleNamespace(fetch_data=Mock(return_value=True), get_all_measurements=Mock(return_value=measurements))
+    app.ims_weather = SimpleNamespace(
+        fetch_data=Mock(return_value=True),
+        get_all_measurements=Mock(return_value=measurements),
+        get_observation_time=Mock(return_value={"raw": datetime.now(timezone.utc).isoformat()}),
+    )
 
     with patch("weather_display.main.config.USE_MOCK_DATA", False):
         app._update_weather()

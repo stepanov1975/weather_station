@@ -14,6 +14,17 @@ Service last-hour XML feed and Hadera forecasts from the IMS city portal:
 * Weather icons mapped from IMS condition text to the local icon set.
 * Network/API status indicators.
 
+Current observations older than one hour plus the observation polling interval
+(70 minutes with the default settings), or with an unusable timestamp, show an
+API error. Missing or invalid temperature/humidity values retain the last valid
+readings and also show an error until complete, fresh observations arrive.
+
+Forecasts are validated before replacing the offline cache. Each city has a
+separate cache file, such as `~/.local/state/weather_display/forecast_cache_18.json`
+for Hadera (or under `XDG_STATE_HOME` when set). The previous shared
+`forecast_cache.json` is not reused because its city cannot be verified; the
+first launch after this update needs a successful fetch to seed the new cache.
+
 ## Requirements
 
 * Raspberry Pi OS or another Linux desktop environment.
