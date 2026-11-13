@@ -32,6 +32,18 @@ from typing import Dict, Any, Optional
 # Get a logger instance specific to this module
 logger = logging.getLogger(__name__)
 
+# The IMS ten-minute XML feed uses Israel standard time year-round.
+IMS_STANDARD_TIME = datetime.timezone(datetime.timedelta(hours=2))
+
+
+def parse_observation_time(raw_time: str) -> datetime.datetime:
+    """Parse an IMS timestamp, preserving any explicit offset."""
+    observed_at = datetime.datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+    if observed_at.tzinfo is None:
+        observed_at = observed_at.replace(tzinfo=IMS_STANDARD_TIME)
+    return observed_at
+
+
 class IMSLastHourWeather:
     """
     Fetches and parses the last hour weather observation data from the IMS XML feed.
@@ -235,11 +247,9 @@ class IMSLastHourWeather:
                     continue
                 raw_time = observation.findtext("time_obs", "").strip()
                 try:
-                    observation_time = datetime.datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                    observation_time = parse_observation_time(raw_time)
                 except ValueError:
                     continue
-                if observation_time.tzinfo is None:
-                    observation_time = observation_time.replace(tzinfo=datetime.timezone.utc)
                 if latest_time is None or observation_time > latest_time:
                     target_observation = observation
                     latest_time = observation_time
@@ -264,7 +274,7 @@ class IMSLastHourWeather:
 
         Returns:
             Dict[str, Any]: A dictionary structured with 'metadata', 'measurements',
-                            'time' (raw/UTC components), and 'time_israel' keys.
+                            'time' (source timestamp and components), and 'time_israel' keys.
         """
         logger.debug("Extracting data from found observation element...")
         metadata: Dict[str, str] = {}
@@ -283,23 +293,22 @@ class IMSLastHourWeather:
             metadata["StationNumber"] = stn_num_elem.text.strip()
             logger.debug(f"  Extracted StationNumber: {metadata['StationNumber']}")
 
-        # Extract and parse time information (assumed UTC from source)
+        # Extract and parse time information from the feed
         if time_obs_elem is not None and time_obs_elem.text:
             time_text = time_obs_elem.text.strip()
             time_data["raw"] = time_text
             logger.debug(f"  Extracted raw time_obs: {time_text}")
             # Attempt to parse the ISO 8601 format (YYYY-MM-DDTHH:MM:SS)
             try:
-                # Use datetime.fromisoformat for robust ISO parsing
-                dt = datetime.datetime.fromisoformat(time_text)
-                # Store components (still UTC at this point)
+                dt = parse_observation_time(time_text)
+                # Store the source time components
                 time_data["Year"] = str(dt.year)
                 time_data["Month"] = str(dt.month).zfill(2) # Pad with zero
                 time_data["Day"] = str(dt.day).zfill(2)
                 time_data["Hour"] = str(dt.hour).zfill(2)
                 time_data["Minute"] = str(dt.minute).zfill(2)
                 time_data["Second"] = str(dt.second).zfill(2)
-                logger.debug(f"  Parsed time components (UTC): {time_data}")
+                logger.debug(f"  Parsed time components: {time_data}")
             except (ValueError, TypeError) as e:
                 logger.warning(f"Could not parse time_obs '{time_text}' as ISO 8601: {e}")
                 # Clear components if parsing failed
@@ -332,7 +341,7 @@ class IMSLastHourWeather:
         station_data = {
             "metadata": metadata,
             "measurements": measurements,
-            "time": time_data # Contains raw and potentially UTC components
+            "time": time_data # Contains the raw timestamp and source components
         }
 
         # Convert time to Israel timezone and add it
@@ -343,15 +352,15 @@ class IMSLastHourWeather:
 
     def _convert_to_israel_time(self, time_data: Dict[str, str]) -> Dict[str, str]:
         """
-        Converts a dictionary containing UTC time components to Israel time.
+        Converts IMS time data to Israel local time.
 
         Attempts to parse the 'raw' timestamp if available, otherwise constructs
         a datetime object from individual components ('Year', 'Month', etc.).
-        Assumes the input time is UTC. Converts the resulting datetime object
-        to the 'Asia/Jerusalem' timezone.
+        Interprets times without an offset as Israel standard time and converts
+        them to 'Asia/Jerusalem' for local daylight saving time.
 
         Args:
-            time_data (Dict[str, str]): Dictionary containing UTC time information.
+            time_data (Dict[str, str]): Dictionary containing source time information.
                                         Should ideally have a 'raw' key with an
                                         ISO 8601 timestamp, or individual component
                                         keys ('Year', 'Month', 'Day', etc.).
@@ -364,34 +373,21 @@ class IMSLastHourWeather:
         """
         logger.debug(f"Attempting to convert time data to Israel time: {time_data}")
         try:
-            utc_dt: Optional[datetime.datetime] = None
+            observed_at: datetime.datetime
             # Prioritize parsing the raw ISO timestamp if available
             if "raw" in time_data:
                 try:
-                    # Use fromisoformat for robust parsing
-                    raw_time = time_data["raw"]
-                    if raw_time.endswith("Z"):
-                        raw_time = f"{raw_time[:-1]}+00:00"
-                    parsed_time = datetime.datetime.fromisoformat(raw_time)
-                    if parsed_time.tzinfo is None:
-                        utc_dt = pytz.utc.localize(parsed_time)
-                    else:
-                        utc_dt = parsed_time.astimezone(pytz.utc)
-                    logger.debug(f"  Parsed raw timestamp '{time_data['raw']}' as UTC: {utc_dt}")
+                    observed_at = parse_observation_time(time_data["raw"])
                 except (ValueError, TypeError) as e:
                     logger.warning(f"  Could not parse raw timestamp '{time_data['raw']}' as ISO: {e}. Trying components.")
                     # Fallback to constructing from components if raw parsing fails
-                    utc_dt = self._construct_datetime_from_components(time_data)
+                    observed_at = self._construct_datetime_from_components(time_data)
             else:
                 # If no raw timestamp, construct directly from components
                 logger.debug("  No raw timestamp found, constructing from components.")
-                utc_dt = self._construct_datetime_from_components(time_data)
+                observed_at = self._construct_datetime_from_components(time_data)
 
-            if utc_dt is None:
-                 raise ValueError("Failed to obtain a valid UTC datetime object.")
-
-            # Convert the UTC datetime to the target Israel timezone
-            israel_dt = utc_dt.astimezone(self.israel_timezone)
+            israel_dt = observed_at.astimezone(self.israel_timezone)
             logger.debug(f"  Converted to Israel time: {israel_dt}")
 
             # Format the result as a dictionary
@@ -408,19 +404,19 @@ class IMSLastHourWeather:
 
         except Exception as e:
             # Log the error and return original data with an error flag
-            logger.error(f"Error converting UTC time to Israel time: {e}", exc_info=True)
+            logger.error(f"Error converting IMS time to Israel local time: {e}", exc_info=True)
             time_data_copy = time_data.copy()
             time_data_copy["Conversion_Error"] = str(e)
             return time_data_copy
 
-    def _construct_datetime_from_components(self, time_data: Dict[str, str]) -> Optional[datetime.datetime]:
+    def _construct_datetime_from_components(self, time_data: Dict[str, str]) -> datetime.datetime:
         """
-        Constructs a timezone-aware datetime object (UTC) from time components.
+        Constructs a datetime in Israel standard time from time components.
 
         Helper method used when a raw timestamp isn't available or parsable.
         Extracts Year, Month, Day, Hour, Minute, Second from the dictionary,
         converts them to integers, and creates a `datetime.datetime` object
-        localized to UTC.
+        in Israel standard time.
 
         Args:
             time_data (Dict[str, str]): Dictionary potentially containing string
@@ -428,9 +424,7 @@ class IMSLastHourWeather:
                                         'Hour', 'Minute', 'Second'.
 
         Returns:
-            Optional[datetime.datetime]: A timezone-aware datetime object set to UTC,
-                                         or None if essential components are missing
-                                         or invalid.
+            datetime.datetime: A timezone-aware datetime in Israel standard time.
 
         Raises:
             ValueError: If required components are missing or cannot be converted
@@ -450,12 +444,7 @@ class IMSLastHourWeather:
             minute = int(time_data.get("Minute", 0))
             second = int(time_data.get("Second", 0))
 
-            # Create a naive datetime object first
-            dt_naive = datetime.datetime(year, month, day, hour, minute, second)
-            # Localize the naive datetime to UTC
-            dt_aware_utc = pytz.utc.localize(dt_naive)
-            logger.debug(f"  Constructed UTC datetime: {dt_aware_utc}")
-            return dt_aware_utc
+            return datetime.datetime(year, month, day, hour, minute, second, tzinfo=IMS_STANDARD_TIME)
         except (ValueError, TypeError, KeyError) as e:
             # Log error if components are missing or invalid format
             logger.error(f"Failed to construct datetime from components {time_data}: {e}")
@@ -472,7 +461,7 @@ class IMSLastHourWeather:
         """
         Returns the entire parsed data dictionary for the station.
 
-        This includes metadata, all measurements, and time information (UTC and Israel).
+        This includes metadata, all measurements, and time information (source and Israel local time).
         Returns None if data has not been successfully fetched yet.
 
         Returns:
@@ -542,13 +531,13 @@ class IMSLastHourWeather:
         """
         Returns the observation time information.
 
-        Can return either the time converted to Israel timezone or the original
-        UTC time components based on the `israel_time` flag.
+        Returns Israel local time or the original source time based on the
+        `israel_time` flag.
 
         Args:
             israel_time (bool): If True (default), returns the time converted to
                                 'Asia/Jerusalem'. If False, returns the original
-                                UTC time data (components and raw string).
+                                source time data (components and raw string).
 
         Returns:
             Optional[Dict[str, str]]: A dictionary containing time information
@@ -566,9 +555,9 @@ class IMSLastHourWeather:
                 return self.data["time_israel"]
             else:
                  logger.warning("Requested Israel time, but 'time_israel' key is missing in data.")
-                 # Fallback to UTC time if Israel time conversion failed or wasn't stored
+                 # Fallback to the source time if the conversion wasn't stored
                  return self.data.get("time")
-        else: # Requesting UTC time
+        else: # Requesting source time
             return self.data.get("time")
 
 
