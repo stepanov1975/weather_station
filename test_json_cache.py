@@ -46,6 +46,18 @@ def test_json_cache_ignores_unreadable_json(tmp_path: Path) -> None:
     assert not cache.is_valid(max_age_seconds=60)
 
 
+def test_json_cache_recovers_from_invalid_utf8(tmp_path: Path) -> None:
+    cache_path = tmp_path / "forecast.json"
+    cache_path.write_bytes(b"\xff")
+
+    cache = JsonCache(cache_path)
+
+    assert cache.payload is None
+    assert cache.timestamp is None
+    cache.store({"data": {"title": "Hadera"}})
+    assert JsonCache(cache_path).payload == cache.payload
+
+
 def test_json_cache_ignores_invalid_cache_shape(tmp_path: Path) -> None:
     cache_path = tmp_path / "forecast.json"
     cache_path.write_text(

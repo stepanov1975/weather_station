@@ -188,6 +188,7 @@ class IMSLastHourWeather:
         an exact, case-insensitive match on the 'stn_name' tag. If no exact match is
         found, it attempts a partial, case-insensitive match (checking if
         `self.station_name` is contained within the 'stn_name' tag text).
+        Selects the newest timestamp for the matched station, regardless of feed order.
 
         Args:
             root (ET.Element): The root element of the parsed XML document.
@@ -226,6 +227,23 @@ class IMSLastHourWeather:
 
         # --- Process Found Observation or Return None ---
         if target_observation is not None:
+            # Keep station matching behavior, then select its newest observation.
+            matched_name = target_observation.findtext("stn_name", "").strip().upper()
+            latest_time: Optional[datetime.datetime] = None
+            for observation in root.findall("Observation"):
+                if observation.findtext("stn_name", "").strip().upper() != matched_name:
+                    continue
+                raw_time = observation.findtext("time_obs", "").strip()
+                try:
+                    observation_time = datetime.datetime.fromisoformat(raw_time.replace("Z", "+00:00"))
+                except ValueError:
+                    continue
+                if observation_time.tzinfo is None:
+                    observation_time = observation_time.replace(tzinfo=datetime.timezone.utc)
+                if latest_time is None or observation_time > latest_time:
+                    target_observation = observation
+                    latest_time = observation_time
+
             # Extract data from the found observation element
             return self._extract_station_data(target_observation)
         else:

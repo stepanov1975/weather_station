@@ -2,9 +2,64 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import patch
 
+import pytest
 import requests
 
 from weather_display.services.ims_lasthour import IMSLastHourWeather
+
+
+@pytest.mark.parametrize("station_name", ["en hahoresh", "hahoresh"])
+@pytest.mark.parametrize("order", [(0, 1, 2), (2, 1, 0), (1, 2, 0)])
+def test_fetch_selects_latest_station_reading(
+    tmp_path: Path, station_name: str, order: tuple[int, ...]
+) -> None:
+    readings = [
+        ("2026-09-12T09:00:00", "29.3", "63"),
+        ("2026-09-12T09:30:00", "30", "61"),
+        ("2026-09-12T09:50:00", "30.5", "60"),
+    ]
+    xml_path = tmp_path / "imslasthour.xml"
+    xml_path.write_text(
+        "<ims>" + "".join(
+            f"<Observation><stn_name>EN HAHORESH</stn_name>"
+            f"<time_obs>{readings[i][0]}</time_obs>"
+            f"<TD>{readings[i][1]}</TD><RH>{readings[i][2]}</RH></Observation>"
+            for i in order
+        ) + "</ims>",
+        encoding="utf-8",
+    )
+    weather = IMSLastHourWeather(station_name)
+
+    assert weather.fetch_data(use_local_file=True, local_file_path=str(xml_path))
+    assert weather.get_measurement("TD")["value"] == "30.5"
+    assert weather.get_measurement("RH")["value"] == "60"
+    assert weather.get_observation_time(israel_time=False)["raw"] == readings[2][0]
+
+
+@pytest.mark.parametrize("station_name", ["en hahoresh", "hahoresh"])
+@pytest.mark.parametrize("unusable_time", ["", "invalid"])
+def test_latest_reading_stays_with_selected_station_and_ignores_unusable_times(
+    tmp_path: Path, station_name: str, unusable_time: str
+) -> None:
+    xml_path = tmp_path / "imslasthour.xml"
+    xml_path.write_text(
+        f"""<ims>
+  <Observation><stn_name>EN HAHORESH</stn_name>
+    <time_obs>{unusable_time}</time_obs><TD>29.3</TD></Observation>
+  <Observation><stn_name>EN HAHORESH OTHER</stn_name>
+    <time_obs>2026-09-12T10:00:00</time_obs><TD>35</TD></Observation>
+  <Observation><stn_name>EN HAHORESH</stn_name>
+    <time_obs>2026-09-12T09:50:00</time_obs><TD>30.5</TD></Observation>
+  <Observation><stn_name>EN HAHORESH</stn_name>
+    <time_obs>{unusable_time}</time_obs><TD>29.3</TD></Observation>
+</ims>""",
+        encoding="utf-8",
+    )
+    weather = IMSLastHourWeather(station_name)
+
+    assert weather.fetch_data(use_local_file=True, local_file_path=str(xml_path))
+    assert weather.get_metadata()["StationName"] == "EN HAHORESH"
+    assert weather.get_measurement("TD")["value"] == "30.5"
 
 
 def test_fetch_data_from_local_xml_extracts_station_measurements(tmp_path: Path) -> None:
