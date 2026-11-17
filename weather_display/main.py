@@ -691,6 +691,7 @@ class WeatherDisplayApp:
                     # Keep api_status as 'error', connection_status is already False
 
             previous_data = getattr(self, "_last_current_weather_data", {})
+            fresh_fields = set() if stale else set(current_weather_data)
             if current_weather_data and not stale:
                 current_weather_data = {**previous_data, **current_weather_data}
                 self._last_current_weather_data = current_weather_data.copy()
@@ -707,6 +708,7 @@ class WeatherDisplayApp:
                     'connection_status': connection_status,
                     'api_status': api_status, # Status specific to this IMS fetch ('ok', 'error', 'mock')
                     'stale': stale,
+                    'stale_fields': sorted(current_weather_data.keys() - fresh_fields),
                 }
                 # Use after(0, ...) to schedule the update on the main Tkinter event loop
                 # Pass a copy of the payload to avoid potential race conditions if the dict is modified later

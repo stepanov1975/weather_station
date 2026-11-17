@@ -1,5 +1,6 @@
 """Headless rendering tests for the application window."""
 
+import os
 from unittest.mock import Mock, patch
 
 import pytest
@@ -12,6 +13,13 @@ from weather_display.utils.localization import get_translation
 class _Widget:
     def __init__(self) -> None:
         self.values: dict[str, object] = {}
+        self.visible = True
+
+    def grid_remove(self) -> None:
+        self.visible = False
+
+    def grid(self) -> None:
+        self.visible = True
 
     def configure(self, **kwargs: object) -> None:
         self.values.update(kwargs)
@@ -36,6 +44,8 @@ def _window_with_labels() -> AppWindow:
     window.weekday_label = _Widget()
     window.day_label = _Widget()
     window.month_year_label = _Widget()
+    window.temp_title = _Widget()
+    window.humidity_title = _Widget()
     window.temp_value = _Widget()
     window.humidity_value = _Widget()
     window.forecast_day_frames = _forecast_day_frames()
@@ -105,17 +115,16 @@ def test_update_forecast_displays_loaded_icon() -> None:
     window.icon_handler.load_icon.assert_called_once_with(1, config.FORECAST_ICON_SIZE)
 
 
-def test_update_forecast_displays_not_available_when_icon_is_missing() -> None:
+def test_update_forecast_hides_missing_icon_and_restores_valid_icon() -> None:
     window = _window_with_labels()
     window.icon_handler.load_icon.return_value = None
 
     window.update_forecast({"data": [{"icon_code": 99}]})
 
-    not_available = get_translation("not_available", config.LANGUAGE)
-    assert window.forecast_day_frames[0]["icon"].values == {
-        "image": None,
-        "text": not_available,
-    }
+    assert not window.forecast_day_frames[0]["icon"].visible
+    window.icon_handler.load_icon.return_value = object()
+    window.update_forecast({"data": [{"icon_code": 1}]})
+    assert window.forecast_day_frames[0]["icon"].visible
 
 
 @pytest.mark.parametrize(
@@ -148,7 +157,7 @@ def test_update_forecast_clears_frames_without_forecast_data() -> None:
     not_available = get_translation("not_available", config.LANGUAGE)
     for forecast_day in window.forecast_day_frames:
         assert forecast_day["day"].values["text"] == not_available
-        assert forecast_day["icon"].values == {"image": None, "text": ""}
+        assert not forecast_day["icon"].visible
         assert forecast_day["condition"].values["text"] == ""
         assert forecast_day["temp"].values["text"] == ""
 
@@ -241,3 +250,71 @@ def test_apply_fullscreen_uses_configured_size_when_fallback_fails() -> None:
     window._apply_fullscreen()
 
     window.geometry.assert_called_once_with(f"{config.APP_WIDTH}x{config.APP_HEIGHT}")
+
+
+def test_stale_readings_are_marked_individually_and_recover() -> None:
+    window = _window_with_labels()
+    window.status_bar_frame = None
+    data = {"temperature": 27, "humidity": 60}
+    with patch.object(config, "LANGUAGE", "en"):
+        window.update_current_weather({"data": data, "stale": True, "stale_fields": ["humidity"]})
+        assert window.temp_title.values["text"] == "Temperature"
+        assert "stale" in window.humidity_title.values["text"].lower()
+        window.update_current_weather({"data": data, "stale": False})
+        assert window.humidity_title.values["text"] == "Humidity"
+
+
+@pytest.mark.skipif(not os.environ.get("DISPLAY"), reason="requires an X display")
+def test_forecast_and_readings_fit_after_window_resize(monkeypatch) -> None:
+    monkeypatch.setattr(config, "FULLSCREEN", False)
+    monkeypatch.setattr(config, "LANGUAGE", "ru")
+    window = AppWindow()
+    try:
+        window.overrideredirect(True)
+        window.update_time("22:08")
+        window.update_date("Понедельник, 28 Сентября 2026")
+        window.update_current_weather({"data": {"temperature": -12, "humidity": 100}, "stale": True})
+        day = {"date": "2026-11-23", "condition": "Partly cloudy, possible rain", "icon_code": 14,
+               "min_temp": -12, "max_temp": 24}
+        window.update_forecast({"data": [day] * 3})
+        card = window.forecast_day_frames[0]
+        for size in ("1440x810", "800x480", "1920x1080"):
+            window.geometry(f"{size}+8000+8000")
+            window.update()
+            for widget in (window.time_label, window.weekday_label, window.day_label,
+                           window.month_year_label, window.temp_title, window.temp_value,
+                           window.humidity_title, window.humidity_value,
+                           card["day"], card["condition"], card["icon"], card["temp"]):
+                label = widget._label
+                left, top = label.winfo_rootx(), label.winfo_rooty()
+                right, bottom = left + label.winfo_width(), top + label.winfo_height()
+                parent = widget
+                while parent is not None:
+                    x, y = parent.winfo_rootx(), parent.winfo_rooty()
+                    left, top = max(left, x), max(top, y)
+                    right = min(right, x + parent.winfo_width())
+                    bottom = min(bottom, y + parent.winfo_height())
+                    parent = parent.master
+                assert right - left >= label.winfo_reqwidth(), (size, widget.cget("text"))
+                assert bottom - top >= label.winfo_reqheight(), (size, widget.cget("text"))
+        window.update_forecast({"data": []})
+        window.update()
+        assert not card["icon"].winfo_ismapped()
+        window.update_forecast({"data": [day]})
+        window.update()
+        assert card["icon"].winfo_ismapped()
+    finally:
+        window.destroy()
+
+
+def test_status_colors_have_readable_contrast_in_light_mode() -> None:
+    def luminance(color: str) -> float:
+        rgb = [int(color[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        linear = [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in rgb]
+        return sum(channel * weight for channel, weight in zip(linear, (0.2126, 0.7152, 0.0722), strict=True))
+
+    background = luminance(config.COLOR_THEME["frame_background"][1])
+    for key in ("status_text", "status_ok_text", "status_error_text"):
+        foreground = luminance(config.COLOR_THEME[key][1])
+        light, dark = max(background, foreground), min(background, foreground)
+        assert (light + 0.05) / (dark + 0.05) >= 4.5

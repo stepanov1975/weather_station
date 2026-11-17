@@ -3,7 +3,7 @@
 
 import json
 import unittest
-from datetime import date
+from datetime import date, timedelta
 from pathlib import Path
 from unittest.mock import Mock, patch
 
@@ -298,6 +298,10 @@ def test_forecast_text_fallback_preserves_condition_meaning(
 
 
 @pytest.mark.parametrize("bad_payload", [
+    {"data": {"forecast_data": {
+        (date.today() - timedelta(days=1)).isoformat(): {"daily": {"maximum_temperature": 24}},
+    }}},
+    {"data": {"forecast_data": {date.today().isoformat(): {"daily": {"minimum_temperature": ""}}}}},
     {"data": None},
     {"data": {}},
     {"data": {"forecast_data": []}},

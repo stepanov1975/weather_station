@@ -84,6 +84,7 @@ class AppWindow(ctk.CTk):
         self.geometry(f"{config.APP_WIDTH}x{config.APP_HEIGHT}")
         self.configure(fg_color=self._get_color("background")) # Set main window background
 
+        self._fonts: dict[str, ctk.CTkFont] = {}
         self.icon_handler = WeatherIconHandler()
         logger.debug("WeatherIconHandler initialized.")
 
@@ -106,6 +107,8 @@ class AppWindow(ctk.CTk):
         Returns:
             ctk.CTkFont: The configured font object.
         """
+        if font_key in self._fonts:
+            return self._fonts[font_key]
         font_config = config.FONTS.get(font_key)
         if not font_config:
             logger.warning(f"Font key '{font_key}' not found in config. Using default.")
@@ -113,11 +116,12 @@ class AppWindow(ctk.CTk):
             return ctk.CTkFont(family=config.DEFAULT_FONT_FAMILY, size=12, weight="normal")
 
         family, size, weight = font_config
-        return ctk.CTkFont(
+        self._fonts[font_key] = ctk.CTkFont(
             family=family or config.DEFAULT_FONT_FAMILY, # Use default if None
             size=size,
             weight=weight
         )
+        return self._fonts[font_key]
 
     def _get_color(self, color_key: str, default: str = "#FF00FF") -> str:
         """
@@ -270,7 +274,7 @@ class AppWindow(ctk.CTk):
         )
         # Configure internal grid for forecast days (e.g., 3 columns)
         num_forecast_days = 3 # Assuming 3 days for now
-        self.forecast_frame.grid_columnconfigure(tuple(range(num_forecast_days)), weight=1)
+        self.forecast_frame.grid_columnconfigure(tuple(range(num_forecast_days)), weight=1, uniform="forecast")
         self.forecast_frame.grid_rowconfigure(0, weight=1) # Single row expands
         logger.debug("Forecast frame created.")
 
@@ -340,7 +344,7 @@ class AppWindow(ctk.CTk):
         self.time_label = ctk.CTkLabel(
             parent_frame,
             text="00:00",
-            font=self._get_font('time'),
+            height=1, font=self._get_font('time'),
             text_color=text_color,
             anchor="center",
             justify="center"
@@ -371,7 +375,7 @@ class AppWindow(ctk.CTk):
         # Weekday Label
         self.weekday_label = ctk.CTkLabel(
             inner_date_labels_frame, text="Weekday",
-            font=self._get_font('weekday'),
+            height=1, font=self._get_font('weekday'),
             text_color=text_color
         )
         self.weekday_label.pack(pady=(0, text_pady))
@@ -379,7 +383,7 @@ class AppWindow(ctk.CTk):
         # Day Label
         self.day_label = ctk.CTkLabel(
             inner_date_labels_frame, text="00",
-            font=self._get_font('day_number'),
+            height=1, font=self._get_font('day_number'),
             text_color=text_color
         )
         self.day_label.pack(pady=0)
@@ -387,7 +391,7 @@ class AppWindow(ctk.CTk):
         # Month Year Label
         self.month_year_label = ctk.CTkLabel(
             inner_date_labels_frame, text="Month 0000",
-            font=self._get_font('month_year'),
+            height=1, font=self._get_font('month_year'),
             text_color=text_color
         )
         self.month_year_label.pack(pady=(text_pady, 0))
@@ -425,14 +429,14 @@ class AppWindow(ctk.CTk):
 
         self.temp_title = ctk.CTkLabel(
             self.temp_frame, text=get_translation('temperature', config.LANGUAGE),
-            font=self._get_font('current_temp_title'),
+            height=1, font=self._get_font('current_temp_title'),
             text_color=title_color
         )
         self.temp_title.grid(row=0, column=0, sticky="ew", padx=text_padx, pady=(text_pady*2, text_pady))
 
         self.temp_value = ctk.CTkLabel(
             self.temp_frame, text="--°C",
-            font=self._get_font('current_temp_value'),
+            height=1, font=self._get_font('current_temp_value'),
             text_color=text_color
         )
         self.temp_value.grid(row=1, column=0, sticky="n", padx=element_padx, pady=element_pady)
@@ -459,14 +463,14 @@ class AppWindow(ctk.CTk):
 
             self.humidity_title = ctk.CTkLabel(
                 self.humidity_frame, text=get_translation('humidity', config.LANGUAGE),
-                font=self._get_font('current_humidity_title'),
+                height=1, font=self._get_font('current_humidity_title'),
                 text_color=title_color
             )
             self.humidity_title.grid(row=0, column=0, sticky="ew", padx=text_padx, pady=(text_pady*2, text_pady))
 
             self.humidity_value = ctk.CTkLabel(
                 self.humidity_frame, text="--%",
-                font=self._get_font('current_humidity_value'),
+                height=1, font=self._get_font('current_humidity_value'),
                 text_color=text_color
             )
             self.humidity_value.grid(row=1, column=0, sticky="n", padx=element_padx, pady=element_pady)
@@ -513,7 +517,7 @@ class AppWindow(ctk.CTk):
             # --- Create widgets for this forecast day ---
             day_label = ctk.CTkLabel(
                 day_frame, text=f"Day {i+1}",
-                font=self._get_font('forecast_day'),
+                height=1, font=self._get_font('forecast_day'),
                 text_color=text_color
             )
             day_label.grid(row=0, column=0, pady=(text_pady * 2, text_pady))
@@ -523,14 +527,14 @@ class AppWindow(ctk.CTk):
 
             condition_label = ctk.CTkLabel(
                 day_frame, text=na_text,
-                font=self._get_font('forecast_condition'),
+                height=1, font=self._get_font('forecast_condition'),
                 text_color=text_color
             )
             condition_label.grid(row=2, column=0, pady=text_pady)
 
             temp_label = ctk.CTkLabel(
                 day_frame, text="--° / --°",
-                font=self._get_font('forecast_temp'),
+                height=1, font=self._get_font('forecast_temp'),
                 text_color=text_color
             )
             temp_label.grid(row=3, column=0, pady=(text_pady, text_pady * 2))
@@ -548,8 +552,30 @@ class AppWindow(ctk.CTk):
     def _setup_bindings(self):
         """Sets up keyboard bindings."""
         logger.debug("Setting up keyboard bindings...")
+        self.bind("<Configure>", self._resize_content, add="+")
         self.bind("<Escape>", self.exit_fullscreen)
         logger.debug("'<Escape>' key bound to exit_fullscreen.")
+
+    def _resize_content(self, event):
+        if event.widget is not self:
+            return
+        # Font sizes in config are designed for a 1440 x 810 display.
+        # Status, icons and vertical spacing still need room as the window shrinks.
+        fixed_height = config.CONNECTION_FRAME_HEIGHT + config.FORECAST_ICON_SIZE[1] + 80
+        scale = min(1.0, event.width / 1440, (event.height - fixed_height) / (810 - fixed_height))
+        for key, font in self._fonts.items():
+            if key != "status_indicator":
+                size = max(1, round(config.FONTS[key][1] * scale))
+                if size != font.cget("size"):
+                    font.configure(size=size)
+
+        frame_width = event.width - 2 * config.ELEMENT_MARGINS["padx"]
+        card_width = frame_width // len(self.forecast_day_frames)
+        wrap = max(1, card_width - 2 * (config.ELEMENT_PADDING["padx"] + config.TEXT_PADDING["padx"]))
+        for card in self.forecast_day_frames:
+            label = card["condition"]
+            if label.cget("wraplength") != wrap:
+                label.configure(wraplength=wrap)
 
     # --- Public Update Methods ---
 
@@ -606,6 +632,14 @@ class AppWindow(ctk.CTk):
 
         na_text = get_translation('not_available', config.LANGUAGE)
 
+        stale_fields = weather_result.get("stale_fields", current_data if weather_result.get("stale") else ())
+        for key, title in (("temperature", self.temp_title), ("humidity", self.humidity_title)):
+            if title:
+                text = get_translation(key, config.LANGUAGE)
+                if key in stale_fields:
+                    text += f" ({get_translation('stale_reading', config.LANGUAGE)})"
+                title.configure(text=text)
+
         # Update Temperature (Always shown)
         temp = current_data.get('temperature')
         temp_text = f"{int(round(temp))}°C" if temp is not None else na_text
@@ -651,11 +685,12 @@ class AppWindow(ctk.CTk):
                 day_widgets['day'].configure(text=day_name)
 
                 # Update Icon
-                icon_image = self.icon_handler.load_icon(icon_code, icon_size)
+                icon_image = self.icon_handler.load_icon(icon_code, icon_size) if icon_code is not None else None
                 if icon_image:
                     day_widgets['icon'].configure(image=icon_image, text="")
+                    day_widgets['icon'].grid()
                 else:
-                    day_widgets['icon'].configure(image=None, text=na_text)
+                    day_widgets['icon'].grid_remove()
                     logger.warning(f"Failed to load forecast icon for code: {icon_code}")
 
                 # Update Condition Text
@@ -676,7 +711,7 @@ class AppWindow(ctk.CTk):
                 # No data for this frame, clear it
                 logger.debug(f"No forecast data available for day {i+1}. Clearing frame.")
                 day_widgets['day'].configure(text=na_text)
-                day_widgets['icon'].configure(image=None, text="")
+                day_widgets['icon'].grid_remove()
                 day_widgets['condition'].configure(text="")
                 day_widgets['temp'].configure(text="")
 

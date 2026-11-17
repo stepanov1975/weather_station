@@ -18,6 +18,7 @@ The application's display language is determined by the `LANGUAGE` setting in
 """
 
 import logging
+import re
 from datetime import datetime
 from typing import Dict, Optional
 
@@ -46,6 +47,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # UI Labels / Sections
         'current_weather': 'Current Weather',
         'temperature': 'Temperature',
+        'stale_reading': 'stale',
         'humidity': 'Humidity',
         'forecast': 'Forecast', # Added forecast title if needed
 
@@ -147,6 +149,7 @@ TRANSLATIONS: Dict[str, Dict[str, str]] = {
         # UI Labels / Sections
         'current_weather': 'Текущая Погода',
         'temperature': 'Температура',
+        'stale_reading': 'данные устарели',
         'humidity': 'Влажность',
         'forecast': 'Прогноз',
 
@@ -338,8 +341,7 @@ def get_translation(key: str, language: str = 'en') -> str:
 # --- Weather Condition Phrase Translation ---
 
 # This map attempts to translate common weather condition phrases (expected from API)
-# into internal translation keys. Matching is case-insensitive and currently uses
-# a simple substring check, which might need refinement for more complex conditions.
+# into internal translation keys. Matching ignores case and repeated whitespace.
 # Keys should be lowercase for consistent matching.
 WEATHER_CONDITION_MAP: Dict[str, str] = {
     # Official IMS city portal phrases
@@ -383,6 +385,7 @@ WEATHER_CONDITION_MAP: Dict[str, str] = {
     'rain and snow': 'rain_and_snow',
     # Storms
     'thunderstorm': 'thunderstorm',
+    'thunderstorms': 'thunderstorm',
     't-storms': 't_storms',
     # Other common phrases
     'mostly sunny': 'mostly_sunny',
@@ -399,62 +402,22 @@ WEATHER_CONDITION_MAP: Dict[str, str] = {
 }
 
 def translate_weather_condition(condition: Optional[str], language: str = 'en') -> str:
-    """
-    Translates a weather condition phrase (from API) into the specified language.
-
-    Performs a case-insensitive search for the best match of the input `condition`
-    phrase within the keys of the `WEATHER_CONDITION_MAP`. If a match is found,
-    it retrieves the corresponding translation key and returns the translated text
-    using `get_translation`. If no match is found, it returns the original condition
-    string.
-
-    Note: The current matching logic is basic (substring check, preferring longer
-    matches). It might require refinement for complex or ambiguous condition phrases.
-
-    Args:
-        condition (Optional[str]): The weather condition text received from the API
-                                   (e.g., "Sunny", "Partly cloudy", "Showers").
-                                   Can be None.
-        language (str): The target language code (e.g., 'en', 'ru'). Defaults to 'en'.
-
-    Returns:
-        str: The translated weather condition string (e.g., "Солнечно"). Returns the
-             original `condition` string if no translation key is found in the map.
-             Returns a localized "Unknown" string if the input `condition` is None.
-    """
+    """Translate whole IMS phrases, preserving qualifiers in compound forecasts."""
     if condition is None:
-        logger.debug("translate_weather_condition called with None condition. Returning 'unknown'.")
         return get_translation('unknown', language)
 
-    condition_lower = condition.lower().strip()
-    logger.debug(f"Attempting to translate weather condition: '{condition}' (lowercase: '{condition_lower}')")
+    normalized = " ".join(condition.lower().split())
+    if normalized in WEATHER_CONDITION_MAP:
+        return get_translation(WEATHER_CONDITION_MAP[normalized], language)
 
-    # --- Find Best Match in Map ---
-    # Simple strategy: iterate through map, find if key is a substring of the condition,
-    # prefer the longest matching key found.
-    best_match_key: Optional[str] = None
-    for map_key_lower in WEATHER_CONDITION_MAP.keys():
-        # Check if the map key (e.g., 'partly cloudy') is present in the input condition
-        if map_key_lower in condition_lower:
-            # If this is the first match, or a longer match than previously found, store it.
-            if best_match_key is None or len(map_key_lower) > len(best_match_key):
-                 best_match_key = map_key_lower
-                 logger.debug(f"  Potential match found: map key '{map_key_lower}' in condition '{condition_lower}'. Current best match.")
+    parts = re.split(r" with |,\s*| and ", normalized)
+    if len(parts) > 1 and all(part in WEATHER_CONDITION_MAP for part in parts):
+        translated = [get_translation(WEATHER_CONDITION_MAP[part], language) for part in parts]
+        return ", ".join(translated).capitalize()
 
-    # --- Translate Using Best Match or Return Original ---
-    if best_match_key:
-        translation_key = WEATHER_CONDITION_MAP[best_match_key]
-        translated_text = get_translation(translation_key, language)
-        logger.info(f"Translated condition '{condition}' (matched key: '{best_match_key}', translation key: '{translation_key}') to '{translated_text}' for language '{language}'.")
-        return translated_text
-    else:
-        # If no key in our map was found within the input condition string
-        logger.warning(
-            f"No translation mapping found in WEATHER_CONDITION_MAP for weather condition: "
-            f"'{condition}'. Returning the original string."
-        )
-        # Return the original, untranslated condition string from the API
-        return condition
+    # Keep the full description when any qualifier has no translation.
+    return condition
+
 
 # ==============================================================================
 # Date/Time Formatting Functions (Using Manual Mappings)

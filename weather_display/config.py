@@ -83,10 +83,10 @@ COLOR_THEME = {
     "text": ("black", "#101010", "#DCE4EE"), # Default text color
     "text_secondary": ("gray", "#606060", "#A0A0A0"), # Less prominent text
     "accent": ("blue", "#3B8ED0", "#1F6AA5"), # Accent color for highlights
-    "status_text": ("white", "#FFFFFF", "#FFFFFF"), # Default/fallback status text color
+    "status_text": ("white", "#303030", "#FFFFFF"), # Default/fallback status text color
     # Specific Status Text Colors (used by AppWindow.update_status_indicators)
-    "status_ok_text": ("green", "#009688", "#4CAF50"),      # Greenish for OK
-    "status_error_text": ("red", "#F44336", "#E57373"),   # Reddish for Error/Offline
+    "status_ok_text": ("green", "#00584D", "#4CAF50"),      # Greenish for OK
+    "status_error_text": ("red", "#9B2420", "#E57373"),   # Reddish for Error/Offline
 }
 
 # Select the active color palette based on DARK_MODE

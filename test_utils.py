@@ -58,6 +58,9 @@ def test_weather_condition_translates_muggy_without_warning(
     [
         ("Sleet", "Мокрый снег"),
         ("Frost", "Мороз"),
+        ("Extremely  cold", "Очень холодно"),
+        ("Mostly sunny with rain", "В основном солнечно, дождь"),
+        ("Mostly cloudy with light rain", "В основном облачно, небольшой дождь"),
         ("Stormy", "Шторм"),
         ("Cloudy, possible rain", "Облачно, возможен дождь"),
         ("Partly cloudy, possible rain", "Переменная облачность, возможен дождь"),

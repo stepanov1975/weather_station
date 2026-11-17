@@ -74,6 +74,7 @@ def test_controller_updates_gui_from_successful_current_weather_fetch() -> None:
             "connection_status": True,
             "api_status": "ok",
             "stale": False,
+            "stale_fields": [],
         }
     ]
     assert app.app_window.statuses[-1][:2] == (True, "ok")
@@ -98,6 +99,7 @@ def test_controller_keeps_last_current_weather_after_fetch_failure() -> None:
         "connection_status": False,
         "api_status": "error",
         "stale": True,
+        "stale_fields": ["humidity", "temperature"],
     }
 
 
@@ -193,6 +195,8 @@ def test_controller_keeps_valid_values_when_observations_are_partial(
     assert result["data"] == expected_data
     assert result["stale"] is True
     assert result["api_status"] == "error"
+    retained = {"temperature": 27.6, "humidity": 61}
+    assert result["stale_fields"] == sorted(key for key in retained if expected_data[key] == retained[key])
     assert app._last_current_weather_data == expected_data
 
 

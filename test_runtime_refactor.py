@@ -7,6 +7,7 @@ import socket
 import subprocess
 import sys
 import threading
+from datetime import date
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, cast
@@ -330,7 +331,7 @@ def test_signal_shutdown_runs_cleanup_even_when_signal_flips_running() -> None:
 
 def test_forecast_uses_persistent_cache_when_offline(tmp_path: Path) -> None:
     cache_path = tmp_path / "forecast.json"
-    payload = _city_payload("2026-07-03")
+    payload = _city_payload(date.today().isoformat())
 
     client = IMSCityForecast(location_id=18, cache_path=cache_path)
     with patch("weather_display.services.ims_forecast.requests.get") as get:
@@ -357,7 +358,7 @@ def test_forecast_uses_persistent_cache_when_offline(tmp_path: Path) -> None:
 
 def test_valid_forecast_cache_does_not_report_fresh_startup_offline(tmp_path: Path) -> None:
     cache_path = tmp_path / "forecast.json"
-    payload = _city_payload("2026-07-03")
+    payload = _city_payload(date.today().isoformat())
     cache_data = {"timestamp": 9999999999.0, "payload": payload}
     cache_path.write_text(json.dumps(cache_data), encoding="utf-8")
 
@@ -371,7 +372,7 @@ def test_valid_forecast_cache_does_not_report_fresh_startup_offline(tmp_path: Pa
 
 def test_forecast_fetch_reports_ok_when_cache_write_fails(tmp_path: Path) -> None:
     cache_path = tmp_path / "missing" / "forecast.json"
-    payload = _city_payload("2026-07-03")
+    payload = _city_payload(date.today().isoformat())
 
     client = IMSCityForecast(location_id=18, cache_path=cache_path)
     with (

@@ -221,11 +221,15 @@ class IMSCityForecast:
                 continue
             weather_code = daily.get("weather_code")
             condition = self._condition_from_code(data, weather_code)
+            max_temp = self._to_float(daily.get("maximum_temperature"))
+            min_temp = self._to_float(daily.get("minimum_temperature"))
+            if max_temp is None and min_temp is None and not condition:
+                continue
             parsed_days.append(
                 ForecastDay(
                     date=display_date,
-                    max_temp=self._to_float(daily.get("maximum_temperature")),
-                    min_temp=self._to_float(daily.get("minimum_temperature")),
+                    max_temp=max_temp,
+                    min_temp=min_temp,
                     condition=condition,
                     icon_code=self._icon_code_for_weather(weather_code, condition),
                 ).to_dict()
@@ -239,7 +243,7 @@ class IMSCityForecast:
         """Require a renderable forecast before replacing the last good cache."""
         try:
             forecast_count = len(payload["data"]["forecast_data"])
-            forecast = self.parse_forecast(payload, days=forecast_count, today=date.min)
+            forecast = self.parse_forecast(payload, days=forecast_count)
             if not forecast:
                 raise ValueError("No daily forecasts")
             for day in forecast:

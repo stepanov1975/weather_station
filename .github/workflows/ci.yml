@@ -42,6 +42,9 @@ jobs:
       - name: Smoke-test the GUI
         run: xvfb-run -a python -c "from weather_display.gui.app_window import AppWindow; window = AppWindow(); window.update_idletasks(); window.destroy()"
 
+      - name: Verify the GUI at kiosk and touchscreen sizes
+        run: xvfb-run -a python -m pytest -q test_app_window.py::test_forecast_and_readings_fit_after_window_resize
+
       - name: Build package
         if: matrix.python-version == '3.11'
         run: python -m build
