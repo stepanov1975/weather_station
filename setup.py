@@ -46,6 +46,7 @@ setup(
         "weather_display": [
             "assets/weather_icons/*.png",
             "assets/interference_waves.png",
+            "assets/enamel_backing.png",
             "py.typed",
         ],
     },

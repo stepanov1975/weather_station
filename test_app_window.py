@@ -294,6 +294,14 @@ def test_forecast_and_readings_fit_after_window_resize(monkeypatch) -> None:
             assert card["frame"].winfo_height() >= round(90 * scale)
             assert card["icon"].winfo_height() >= round(82 * scale)
             assert card["day"].winfo_rootx() == card["condition"].winfo_rootx()
+            surface = window._enamel
+            clock_layers = surface.find_withtag(surface.widget_tag(window.time_label))
+            assert len(clock_layers) > 1
+            assert surface.itemcget(clock_layers[-1], "text") == "22:08"
+            assert surface.itemcget(clock_layers[-1], "fill") == config.ACTIVE_COLORS["accent"]
+            for index, forecast_row in enumerate(window.forecast_day_frames):
+                assert bool(forecast_row["frame"].grid_slaves(row=0)) == bool(index)
+                assert surface.find_withtag(surface.widget_tag(forecast_row["icon"]))
             assert window.time_label.winfo_rootx() + window.time_label.winfo_width() <= window.day_label.winfo_rootx()
             assert header.winfo_rooty() + header.winfo_height() <= forecast.winfo_rooty()
             assert readings.winfo_rootx() + readings.winfo_width() <= forecast.winfo_rootx()
@@ -317,9 +325,16 @@ def test_forecast_and_readings_fit_after_window_resize(monkeypatch) -> None:
         window.update_forecast({"data": []})
         window.update()
         assert not card["icon"].winfo_ismapped()
+        assert not surface.find_withtag(surface.widget_tag(card["icon"]))
         window.update_forecast({"data": [day]})
         window.update()
         assert card["icon"].winfo_ismapped()
+        window.update_status_indicators(False, "offline", None)
+        window.update_time("23:41")
+        window.update()
+        status_face = surface.find_withtag(surface.widget_tag(window.api_status_label))[-1]
+        assert surface.itemcget(status_face, "fill") == config.ACTIVE_COLORS["status_error_text"]
+        assert surface.itemcget(surface.find_withtag(surface.widget_tag(window.time_label))[-1], "text") == "23:41"
     finally:
         window.destroy()
 

@@ -403,6 +403,7 @@ def test_app_window_builds_its_widget_tree_with_headless_toolkit() -> None:
         patch("weather_display.gui.app_window.ctk.CTk.bind"),
         patch("weather_display.gui.app_window.ctk.CTk.grid_columnconfigure"),
         patch("weather_display.gui.app_window.ctk.CTk.grid_rowconfigure"),
+        patch("weather_display.gui.app_window.EnamelSurface"),
         patch("weather_display.gui.app_window.tk.Frame", side_effect=lambda *_args, **_kwargs: Widget()),
         patch("weather_display.gui.app_window.ctk.CTkFrame", side_effect=lambda *_args, **_kwargs: Widget()),
         patch("weather_display.gui.app_window.ctk.CTkLabel", side_effect=lambda *_args, **_kwargs: Widget()),

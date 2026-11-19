@@ -4,3 +4,4 @@ include requirements.txt
 include requirements-dev.txt
 recursive-include weather_display/assets/weather_icons *.png
 include weather_display/assets/interference_waves.png
+include weather_display/assets/enamel_backing.png

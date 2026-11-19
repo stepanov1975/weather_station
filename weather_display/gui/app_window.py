@@ -14,6 +14,7 @@ import customtkinter as ctk
 # Local application imports
 # Use 'config' directly for accessing settings
 from .. import config
+from .enamel import EnamelSurface
 from ..utils.localization import (
     get_translation,
     translate_weather_condition,
@@ -31,6 +32,8 @@ ctk.set_appearance_mode("dark" if config.DARK_MODE else "light")
 class AppWindow(ctk.CTk):
     """Fullscreen weather board with a clock, local observations and three forecast rows."""
 
+    _enamel: Optional[EnamelSurface] = None
+
     def __init__(self):
         """Initializes the AppWindow, setting up layout and widgets based on config."""
         super().__init__()
@@ -45,7 +48,11 @@ class AppWindow(ctk.CTk):
         logger.debug("WeatherIconHandler initialized.")
 
         self._configure_fullscreen()
+        self._board_labels: list = []
+        self._board_rules: list = []
         self._setup_layout()
+        if config.DARK_MODE:
+            self._enamel = EnamelSurface(self, self._board_labels, self._board_rules)
         self._setup_bindings()
 
         logger.info("AppWindow initialized successfully.")
@@ -142,7 +149,9 @@ class AppWindow(ctk.CTk):
         self._label(mast, station.upper(), "station").place(relx=0, rely=.58, anchor="w")
         with Image.open(Path(__file__).resolve().parents[1] / "assets/interference_waves.png") as image:
             self.wave_image = ctk.CTkImage(light_image=image.copy(), size=(446, 56))
-        ctk.CTkLabel(mast, text="", image=self.wave_image).place(relx=1, rely=.5, anchor="e")
+        wave = ctk.CTkLabel(mast, text="", image=self.wave_image)
+        wave.place(relx=1, rely=.5, anchor="e")
+        self._board_labels.append((wave, "wave"))
 
         for y in (.091, .515):
             self._rule(self).place(relx=.034, rely=y, relwidth=.932)
@@ -176,20 +185,27 @@ class AppWindow(ctk.CTk):
             self.status_bar_frame = ctk.CTkFrame(self, fg_color="transparent")
             self.status_bar_frame.place(relx=.034, rely=.975, relwidth=.932, anchor="sw")
             self.status_bar_frame.grid_columnconfigure(0, weight=1)
+            self._rule(self.status_bar_frame).grid(row=0, column=0, columnspan=2,
+                                                   sticky="ew", pady=(0, 5))
             pending = get_translation("status_pending", config.LANGUAGE)
-            self.network_status_label = self._label(self.status_bar_frame, pending, "status_indicator")
-            self.network_status_label.grid(row=0, column=0, sticky="w")
+            self.network_status_label = self._label(self.status_bar_frame, pending, "status_indicator",
+                                                    role="network")
+            self.network_status_label.grid(row=1, column=0, sticky="w")
             self.api_status_label = self._label(self.status_bar_frame, pending, "status_indicator")
-            self.api_status_label.grid(row=0, column=1, sticky="e")
+            self.api_status_label.grid(row=1, column=1, sticky="e")
 
-    def _label(self, parent, text, font, color="text"):
-        return ctk.CTkLabel(parent, text=text, font=self._get_font(font), height=1, width=1,
-                            text_color=self._get_color(color), anchor="w", justify="left")
+    def _label(self, parent, text, font, color="text", role=None):
+        widget = ctk.CTkLabel(parent, text=text, font=self._get_font(font), height=1, width=1,
+                              text_color=self._get_color(color), anchor="w", justify="left")
+        self._board_labels.append((widget, role or font))
+        return widget
 
     def _rule(self, parent):
         # A native frame preserves a one-pixel rule at kiosk scaling.
-        return tk.Frame(parent, width=1, height=1, borderwidth=0, highlightthickness=0,
+        rule = tk.Frame(parent, width=1, height=1, borderwidth=0, highlightthickness=0,
                         background=self._get_color("divider"))
+        self._board_rules.append(rule)
+        return rule
 
     def _reading(self, key, font_prefix, initial_value, column):
         parent = self.current_conditions_frame
@@ -209,7 +225,8 @@ class AppWindow(ctk.CTk):
             row.grid(row=index, column=0, sticky="nsew")
             row.grid_columnconfigure(1, weight=1)
             row.grid_rowconfigure((1, 2), weight=1)
-            self._rule(row).grid(row=0, column=0, columnspan=3, sticky="ew")
+            if index:
+                self._rule(row).grid(row=0, column=0, columnspan=3, sticky="ew")
             day = self._label(row, "", "forecast_day")
             day.grid(row=1, column=1, sticky="sw")
             icon = self._label(row, "", "forecast_day")
@@ -229,6 +246,7 @@ class AppWindow(ctk.CTk):
         logger.debug("'<Escape>' key bound to exit_fullscreen.")
 
     def _resize_content(self, event):
+        self._refresh_finish()
         if event.widget is not self:
             return
         scale = min(event.width / 1440, event.height / 810)
@@ -256,8 +274,13 @@ class AppWindow(ctk.CTk):
 
     # --- Public Update Methods ---
 
+    def _refresh_finish(self):
+        if self._enamel:
+            self._enamel.invalidate()
+
     def update_time(self, time_str: str):
         """Updates the time display label (HH:MM)."""
+        self._refresh_finish()
         logger.debug(f"Updating time display with: {time_str}")
         try:
             time_parts = time_str.split(':')
@@ -269,6 +292,7 @@ class AppWindow(ctk.CTk):
 
     def update_date(self, date_str: str):
         """Updates the weekday, large day and month, and year."""
+        self._refresh_finish()
         logger.debug(f"Updating date display with: {date_str}")
         try:
             parts = date_str.split(', ')
@@ -299,6 +323,7 @@ class AppWindow(ctk.CTk):
 
     def update_current_weather(self, weather_result: Dict[str, Any]):
         """Updates the current weather display section."""
+        self._refresh_finish()
         logger.debug(f"Updating current weather display. Received data keys: {list(weather_result.keys())}")
 
         # Status indicators are updated separately by calls from main.py
@@ -350,6 +375,7 @@ class AppWindow(ctk.CTk):
         The controller records each service's API status, combines the statuses,
         and centrally schedules publication through `update_status_indicators`.
         """
+        self._refresh_finish()
         logger.debug(f"Updating forecast display. API Status: {forecast_result.get('api_status')}")
         # We don't update the main status bar from here, as it's handled centrally
 
@@ -413,6 +439,7 @@ class AppWindow(ctk.CTk):
         # Only proceed if status bar is enabled and widgets exist
         if not self.status_bar_frame or not self.network_status_label or not self.api_status_label:
             return
+        self._refresh_finish()
 
         logger.debug(f"Updating status indicators: Connection={connection_status}, API Status='{api_status}', Last Success Time={last_success_time}")
 

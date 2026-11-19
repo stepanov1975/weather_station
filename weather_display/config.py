@@ -80,13 +80,13 @@ COLOR_THEME = {
     "secondary": ("green", "#2CC985", "#2FA572"), # Example secondary color
     "background": ("gray", "#E5E5E5", "#102722"), # Main window background
     "frame_background": ("gray", "#DBDBDB", "#2B2B2B"), # Frame background
-    "text": ("black", "#101010", "#F6F4EB"), # Default text color
-    "text_secondary": ("gray", "#606060", "#C0D4CC"), # Less prominent text
-    "accent": ("mint", "#205F48", "#B5E0C4"),
+    "text": ("black", "#101010", "#F4F3EB"), # Default text color
+    "text_secondary": ("gray", "#606060", "#D5E3D7"), # Less prominent text
+    "accent": ("mint", "#205F48", "#C9EDD5"),
     "divider": ("green", "#90A59A", "#4A6961"),
     "status_text": ("white", "#303030", "#FFFFFF"), # Default/fallback status text color
     # Specific Status Text Colors (used by AppWindow.update_status_indicators)
-    "status_ok_text": ("green", "#00584D", "#4CAF50"),      # Greenish for OK
+    "status_ok_text": ("green", "#00584D", "#B8DBC0"),      # Greenish for OK
     "status_error_text": ("red", "#9B2420", "#E57373"),   # Reddish for Error/Offline
 }
 
