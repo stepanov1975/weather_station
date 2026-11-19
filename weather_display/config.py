@@ -78,11 +78,12 @@ DARK_MODE = True
 COLOR_THEME = {
     "primary": ("blue", "#3B8ED0", "#1F6AA5"), # Example primary color
     "secondary": ("green", "#2CC985", "#2FA572"), # Example secondary color
-    "background": ("gray", "#E5E5E5", "#242424"), # Main window background
+    "background": ("gray", "#E5E5E5", "#102722"), # Main window background
     "frame_background": ("gray", "#DBDBDB", "#2B2B2B"), # Frame background
-    "text": ("black", "#101010", "#DCE4EE"), # Default text color
-    "text_secondary": ("gray", "#606060", "#A0A0A0"), # Less prominent text
-    "accent": ("blue", "#3B8ED0", "#1F6AA5"), # Accent color for highlights
+    "text": ("black", "#101010", "#F6F4EB"), # Default text color
+    "text_secondary": ("gray", "#606060", "#C0D4CC"), # Less prominent text
+    "accent": ("mint", "#205F48", "#B5E0C4"),
+    "divider": ("green", "#90A59A", "#4A6961"),
     "status_text": ("white", "#303030", "#FFFFFF"), # Default/fallback status text color
     # Specific Status Text Colors (used by AppWindow.update_status_indicators)
     "status_ok_text": ("green", "#00584D", "#4CAF50"),      # Greenish for OK
@@ -92,21 +93,6 @@ COLOR_THEME = {
 # Select the active color palette based on DARK_MODE
 ACTIVE_COLORS = {name: colors[2] if DARK_MODE else colors[1] for name, colors in COLOR_THEME.items()}
 
-# --- Layout Structure ---
-# Defines the relative height proportions of the main UI regions.
-# Values represent weights for the grid rows.
-# Order: [Status Bar, Time/Date Region, Current Conditions Region, Forecast Region]
-# Status bar height is fixed by CONNECTION_FRAME_HEIGHT, so its weight is 0.
-# The remaining weights distribute the available vertical space.
-# Default: Time/Date=1/3, Current=1/4, Forecast=Remainder (~5/12)
-# Example weights to approximate this: Time=4, Current=3, Forecast=5 (total 12)
-REGION_HEIGHT_WEIGHTS = {
-    "status": 0, # Fixed height
-    "time_date": 4,
-    "current_conditions": 3,
-    "forecast": 5,
-}
-
 # --- Fonts ---
 # Default font family used if a specific element doesn't define its own.
 DEFAULT_FONT_FAMILY = "Helvetica"
@@ -115,46 +101,22 @@ DEFAULT_FONT_FAMILY = "Helvetica"
 # Format: (Family, Size, Weight) - Weight can be "normal" or "bold".
 # Use DEFAULT_FONT_FAMILY if family is None.
 FONTS = {
-    "time": (None, 280, "bold"), # Large time display (HH:MM)
-    "weekday": (None, 40, "normal"), # Day of the week (e.g., "Sunday")
-    "day_number": (None, 140, "bold"), # Large day number (e.g., "21")
-    "month_year": (None, 40, "normal"), # Month and year (e.g., "April 2024")
-    "current_temp_value": (None, 80, "bold"), # Current temperature value
-    "current_temp_title": (None, 30, "bold"), # "Temperature" label
-    "current_humidity_value": (None, 80, "bold"), # Current humidity value
-    "current_humidity_title": (None, 30, "bold"), # "Humidity" label
-    "forecast_day": (None, 40, "bold"), # Day name in forecast (e.g., "Mon")
-    "forecast_condition": (None, 35, "normal"), # Weather condition text in forecast
-    "forecast_temp": (None, 35, "normal"), # Temperature range in forecast (e.g., "25° / 18°")
-    "status_indicator": (None, 14, "normal"), # Small text in status bar indicators
+    "station": (None, 22, "bold"),
+    "time": (None, 252, "bold"),
+    "weekday": (None, 46, "normal"),
+    "day_number": (None, 86, "bold"),
+    "month_year": (None, 40, "normal"),
+    "current_temp_value": (None, 108, "bold"),
+    "current_temp_title": (None, 26, "normal"),
+    "current_humidity_value": (None, 84, "bold"),
+    "current_humidity_title": (None, 26, "normal"),
+    "forecast_day": (None, 31, "bold"),
+    "forecast_condition": (None, 24, "normal"),
+    "forecast_temp": (None, 30, "normal"),
+    "status_indicator": (None, 19, "normal"),
 }
 
-# --- Padding and Margins (in pixels) ---
-# Padding defines space *inside* a widget or frame border.
-# Margin defines space *outside* a widget or frame border.
-
-# Padding around the main content area within each major region frame.
-REGION_PADDING = {"padx": 10, "pady": 10}
-
-# Padding around individual elements *within* a region (e.g., labels in current weather).
-ELEMENT_PADDING = {"padx": 5, "pady": 5}
-
-# Padding specifically around text *inside* a label widget.
-TEXT_PADDING = {"padx": 5, "pady": 2}
-
-# Margins *between* elements within a layout (e.g., space between forecast day frames).
-ELEMENT_MARGINS = {"padx": 5, "pady": 5}
-
-# --- Sizes (in pixels) ---
-# Maximum dimensions (width, height) for weather icons displayed in the forecast.
-FORECAST_ICON_SIZE = (96, 96)
-# Height of the top frame used to display connection and API status indicators.
-CONNECTION_FRAME_HEIGHT = 30
-
-# --- Corner Radii (in pixels) ---
-# Defines how rounded the corners of frames and specific widgets are.
-FRAME_CORNER_RADIUS = 8
-STATUS_INDICATOR_CORNER_RADIUS = 5
+FORECAST_ICON_SIZE = (26, 26)
 
 # --- Optional Elements ---
 # Flags to control the visibility of certain UI components.

@@ -1,27 +1,12 @@
-"""
-Main Application Window (GUI) for the Weather Display using CustomTkinter.
-
-This module defines the `AppWindow` class, which inherits from `customtkinter.CTk`
-and constitutes the main graphical user interface of the Weather Display application.
-It implements a component-based architecture driven by configuration settings.
-
-Responsibilities:
-- Setting up the main window's appearance based on config (title, size, fullscreen).
-- Defining the layout structure with configurable region heights using grid geometry.
-- Creating and arranging visual widgets within distinct regions:
-    - Status Bar (Optional)
-    - Time and Date Region
-    - Current Conditions Region (Temperature, Humidity)
-    - Forecast Region (Multi-day forecast)
-- Applying fonts, colors, padding, margins, and corner radii from config.
-- Providing public methods (`update_time`, `update_date`, etc.) for data refresh.
-- Handling basic user interactions (e.g., exiting fullscreen).
-"""
+"""CustomTkinter split-board display for the clock, IMS readings and forecast."""
 
 import logging
 from typing import Dict, List, Any, Optional
 import os
-from datetime import datetime # Added for timestamp formatting
+from datetime import datetime
+from pathlib import Path
+
+from PIL import Image
 
 import customtkinter as ctk
 
@@ -43,37 +28,7 @@ ctk.set_appearance_mode("dark" if config.DARK_MODE else "light")
 
 
 class AppWindow(ctk.CTk):
-    """
-    Represents the main graphical window, managing UI layout and widgets based on config.
-
-    Attributes:
-        icon_handler (WeatherIconHandler): Handles loading weather icons.
-        # --- Main Region Frames ---
-        status_bar_frame (Optional[ctk.CTkFrame]): Top frame for status indicators.
-        time_date_frame (ctk.CTkFrame): Frame for time and date display.
-        current_conditions_frame (ctk.CTkFrame): Frame for current weather details.
-        forecast_frame (ctk.CTkFrame): Frame for the multi-day forecast.
-        # --- Status Bar Widgets (Optional) ---
-        connection_indicator (Optional[ctk.CTkLabel]): Internet status label.
-        network_status_label (Optional[ctk.CTkLabel]): Persistent network status label.
-        api_status_label (Optional[ctk.CTkLabel]): Persistent API status label with last success time.
-        # --- Time/Date Widgets ---
-        time_label (ctk.CTkLabel): Displays current time.
-        date_display_frame (ctk.CTkFrame): Container for date elements.
-        weekday_label (ctk.CTkLabel): Displays current day of the week.
-        day_label (ctk.CTkLabel): Displays current day of the month.
-        month_year_label (ctk.CTkLabel): Displays current month and year.
-        # --- Current Conditions Widgets ---
-        temp_frame (Optional[ctk.CTkFrame]): Sub-frame for temperature.
-        temp_title (Optional[ctk.CTkLabel]): "Temperature" label.
-        temp_value (Optional[ctk.CTkLabel]): Current temperature value.
-        humidity_frame (Optional[ctk.CTkFrame]): Sub-frame for humidity.
-        humidity_title (Optional[ctk.CTkLabel]): "Humidity" label.
-        humidity_value (Optional[ctk.CTkLabel]): Current humidity value.
-        # --- Forecast Widgets ---
-        forecast_day_frames (List[Dict[str, ctk.CTkLabel]]): List holding widgets
-            for each forecast day (frame, day, icon, condition, temp labels).
-    """
+    """Fullscreen weather board with a clock, local observations and three forecast rows."""
 
     def __init__(self):
         """Initializes the AppWindow, setting up layout and widgets based on config."""
@@ -90,7 +45,6 @@ class AppWindow(ctk.CTk):
 
         self._configure_fullscreen()
         self._setup_layout()
-        self._create_widgets()
         self._setup_bindings()
 
         logger.info("AppWindow initialized successfully.")
@@ -178,376 +132,90 @@ class AppWindow(ctk.CTk):
                 logger.warning("Using configured window size as last resort.")
 
     def _setup_layout(self):
-        """
-        Configures the main window grid layout and creates the primary region frames.
+        """Lay out the board in proportions of the active kiosk window."""
+        mast = ctk.CTkFrame(self, fg_color="transparent")
+        mast.place(relx=.034, rely=.013, relwidth=.932, relheight=.073)
+        station = config.IMS_STATION_NAME
+        if station == "Hadera Port" and config.LANGUAGE == "ru":
+            station = "Хадера · Порт"
+        self._label(mast, station.upper(), "station").place(relx=0, rely=.58, anchor="w")
+        with Image.open(Path(__file__).resolve().parents[1] / "assets/interference_waves.png") as image:
+            self.wave_image = ctk.CTkImage(light_image=image.copy(), size=(446, 56))
+        ctk.CTkLabel(mast, text="", image=self.wave_image).place(relx=1, rely=.5, anchor="e")
 
-        Uses `config.REGION_HEIGHT_WEIGHTS` to distribute vertical space among
-        the status bar (if shown), time/date, current conditions, and forecast regions.
-        """
-        logger.debug("Setting up main window layout...")
-        self.grid_columnconfigure(0, weight=1) # Single column expands horizontally
+        for y in (.091, .515):
+            self._rule(self).place(relx=.034, rely=y, relwidth=.932)
+        self.time_date_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.time_date_frame.place(relx=.034, rely=.10, relwidth=.932, relheight=.405)
+        self.time_label = self._label(self.time_date_frame, "00:00", "time", "accent")
+        self.time_label.place(relx=0, rely=.5, anchor="w")
+        self._rule(self.time_date_frame).place(relx=.525, rely=.10, relheight=.8)
+        date_frame = ctk.CTkFrame(self.time_date_frame, fg_color="transparent")
+        date_frame.place(relx=.555, rely=.5, anchor="w")
+        self.weekday_label = self._label(date_frame, "", "weekday")
+        self.day_label = self._label(date_frame, "", "day_number")
+        self.month_year_label = self._label(date_frame, "", "month_year", "text_secondary")
+        for label in (self.weekday_label, self.day_label, self.month_year_label):
+            label.pack(anchor="w")
 
-        # --- Configure Row Weights based on Config ---
-        row_index = 0
-        if config.OPTIONAL_ELEMENTS.get("show_status_bar", True):
-            self.grid_rowconfigure(row_index, weight=config.REGION_HEIGHT_WEIGHTS.get("status", 0))
-            row_index += 1
-        self.grid_rowconfigure(row_index, weight=config.REGION_HEIGHT_WEIGHTS.get("time_date", 4))
-        row_index += 1
-        self.grid_rowconfigure(row_index, weight=config.REGION_HEIGHT_WEIGHTS.get("current_conditions", 3))
-        row_index += 1
-        self.grid_rowconfigure(row_index, weight=config.REGION_HEIGHT_WEIGHTS.get("forecast", 5))
+        self.current_conditions_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.current_conditions_frame.place(relx=.034, rely=.728, relwidth=.399, anchor="w")
+        self.temp_title, self.temp_value = self._reading("temperature", "temp", "--°C", 0)
+        self.humidity_title = self.humidity_value = None
+        if config.OPTIONAL_ELEMENTS.get("show_current_humidity", True):
+            self.humidity_title, self.humidity_value = self._reading("humidity", "humidity", "--%", 1)
 
-        # --- Create Main Region Frames ---
-        current_row = 0
+        self.forecast_frame = ctk.CTkFrame(self, fg_color="transparent")
+        self.forecast_frame.place(relx=.452, rely=.728, relwidth=.514, anchor="w")
+        self.forecast_frame.grid_columnconfigure(0, weight=1)
+        self._create_forecast_region()
 
-        # Status Bar Frame (Optional)
         self.status_bar_frame = None
         if config.OPTIONAL_ELEMENTS.get("show_status_bar", True):
-            self.status_bar_frame = ctk.CTkFrame(
-                self,
-                height=config.CONNECTION_FRAME_HEIGHT,
-                corner_radius=0, # Typically no radius for a top bar
-                fg_color=self._get_color("frame_background") # Use theme color
-            )
-            self.status_bar_frame.grid(row=current_row, column=0, sticky="ew")
-            # Configure columns for status indicators (push to right)
-            self.status_bar_frame.grid_columnconfigure(0, weight=1) # Spacer
-            self.status_bar_frame.grid_columnconfigure(1, weight=0) # Network Status
-            self.status_bar_frame.grid_columnconfigure(2, weight=0) # API Status
-            self.status_bar_frame.grid_propagate(False) # Prevent shrinking
-            logger.debug("Status bar frame created.")
-            current_row += 1
-        else:
-            logger.debug("Status bar is disabled in config.")
+            self.status_bar_frame = ctk.CTkFrame(self, fg_color="transparent")
+            self.status_bar_frame.place(relx=.034, rely=.975, relwidth=.932, anchor="sw")
+            self.status_bar_frame.grid_columnconfigure(0, weight=1)
+            pending = get_translation("status_pending", config.LANGUAGE)
+            self.network_status_label = self._label(self.status_bar_frame, pending, "status_indicator")
+            self.network_status_label.grid(row=0, column=0, sticky="w")
+            self.api_status_label = self._label(self.status_bar_frame, pending, "status_indicator")
+            self.api_status_label.grid(row=0, column=1, sticky="e")
 
-        # Time and Date Region Frame
-        self.time_date_frame = ctk.CTkFrame(
-            self,
-            corner_radius=config.FRAME_CORNER_RADIUS,
-            fg_color="transparent" # Often transparent to show window background
-            # fg_color=self._get_color("frame_background") # Or use frame color
-        )
-        self.time_date_frame.grid(
-            row=current_row, column=0, sticky="nsew",
-            padx=config.ELEMENT_MARGINS['padx'], # Use margins between regions
-            pady=config.ELEMENT_MARGINS['pady']
-        )
-        # Configure internal grid for time/date elements (e.g., 2 columns)
-        self.time_date_frame.grid_columnconfigure(0, weight=2) # Time column wider
-        self.time_date_frame.grid_columnconfigure(1, weight=1) # Date column
-        self.time_date_frame.grid_rowconfigure(0, weight=1)    # Single row expands
-        logger.debug("Time/Date frame created.")
-        current_row += 1
+    def _label(self, parent, text, font, color="text"):
+        return ctk.CTkLabel(parent, text=text, font=self._get_font(font), height=1, width=1,
+                            text_color=self._get_color(color), anchor="w", justify="left")
 
-        # Current Conditions Region Frame
-        self.current_conditions_frame = ctk.CTkFrame(
-            self,
-            corner_radius=config.FRAME_CORNER_RADIUS,
-            fg_color=self._get_color("frame_background")
-        )
-        self.current_conditions_frame.grid(
-            row=current_row, column=0, sticky="nsew",
-            padx=config.ELEMENT_MARGINS['padx'],
-            pady=config.ELEMENT_MARGINS['pady']
-        )
-        # Configure internal grid for temperature and optional humidity.
-        num_current_cols = 1 # Start with temp
-        if config.OPTIONAL_ELEMENTS.get("show_current_humidity", True):
-            num_current_cols += 1
-        if num_current_cols > 0:
-            self.current_conditions_frame.grid_columnconfigure(tuple(range(num_current_cols)), weight=1)
-        self.current_conditions_frame.grid_rowconfigure(0, weight=1) # Single row expands
-        logger.debug("Current Conditions frame created.")
-        current_row += 1
+    def _rule(self, parent):
+        return ctk.CTkFrame(parent, width=1, height=1, corner_radius=0,
+                            fg_color=self._get_color("divider"))
 
-        # Forecast Region Frame
-        self.forecast_frame = ctk.CTkFrame(
-            self,
-            corner_radius=config.FRAME_CORNER_RADIUS,
-            fg_color=self._get_color("frame_background")
-        )
-        self.forecast_frame.grid(
-            row=current_row, column=0, sticky="nsew",
-            padx=config.ELEMENT_MARGINS['padx'],
-            pady=config.ELEMENT_MARGINS['pady']
-        )
-        # Configure internal grid for forecast days (e.g., 3 columns)
-        num_forecast_days = 3 # Assuming 3 days for now
-        self.forecast_frame.grid_columnconfigure(tuple(range(num_forecast_days)), weight=1, uniform="forecast")
-        self.forecast_frame.grid_rowconfigure(0, weight=1) # Single row expands
-        logger.debug("Forecast frame created.")
+    def _reading(self, key, font_prefix, initial_value, column):
+        parent = self.current_conditions_frame
+        title = self._label(parent, get_translation(key, config.LANGUAGE),
+                            f"current_{font_prefix}_title", "text_secondary")
+        title.grid(row=0, column=column, sticky="sw", padx=(0, 12))
+        value = self._label(parent, initial_value, f"current_{font_prefix}_value")
+        value.grid(row=1, column=column, sticky="nw", padx=(0, 12))
+        parent.grid_columnconfigure(column, weight=1)
+        return title, value
 
-        logger.debug("Main layout setup complete.")
-
-    def _create_widgets(self):
-        """Creates and places all UI widgets within their respective region frames."""
-        logger.debug("Creating UI widgets...")
-        if self.status_bar_frame:
-            self._create_status_bar()
-        self._create_time_date_region()
-        self._create_current_conditions_region()
-        self._create_forecast_region()
-        logger.debug("UI widget creation complete.")
-
-    def _create_status_bar(self):
-        """Creates the status indicator labels in the status bar frame."""
-        if not self.status_bar_frame:
-            return
-        logger.debug("Creating status bar indicators...")
-
-        indicator_font = self._get_font('status_indicator')
-        text_color = self._get_color('status_text')
-        padx = config.ELEMENT_PADDING['padx'] // 2 # Use smaller padding for persistent labels
-        pady = config.ELEMENT_PADDING['pady'] // 2
-        pending_text = get_translation('status_pending', config.LANGUAGE)
-
-        # --- Network Status Label ---
-        self.network_status_label = ctk.CTkLabel(
-            self.status_bar_frame,
-            text=(
-                f"{get_translation('network_status', config.LANGUAGE)}: "
-                f"{pending_text}"
-            ),
-            font=indicator_font,
-            text_color=text_color,
-            anchor="e"
-        )
-        self.network_status_label.grid(row=0, column=1, sticky="e", padx=padx, pady=pady)
-        logger.debug("Network status label created.")
-
-        # --- API Status Label ---
-        self.api_status_label = ctk.CTkLabel(
-            self.status_bar_frame,
-            text=(
-                f"{get_translation('api_status', config.LANGUAGE)}: "
-                f"{pending_text}"
-            ),
-            font=indicator_font,
-            text_color=text_color,
-            anchor="e"
-        )
-        self.api_status_label.grid(row=0, column=2, sticky="e", padx=padx, pady=pady)
-        logger.debug("API status label created.")
-
-    def _create_time_date_region(self):
-        """Creates widgets for the time and date display region."""
-        logger.debug("Creating time/date region widgets...")
-        parent_frame = self.time_date_frame
-        text_color = self._get_color('text')
-        region_padx = config.REGION_PADDING['padx']
-        region_pady = config.REGION_PADDING['pady']
-        element_padx = config.ELEMENT_PADDING['padx']
-        text_pady = config.TEXT_PADDING['pady']
-
-        # --- Time Display ---
-        self.time_label = ctk.CTkLabel(
-            parent_frame,
-            text="00:00",
-            height=1, font=self._get_font('time'),
-            text_color=text_color,
-            anchor="center",
-            justify="center"
-        )
-        self.time_label.grid(
-            row=0, column=0, sticky="nsew",
-            padx=(region_padx, element_padx), # Region padding left, element padding right
-            pady=region_pady
-        )
-        logger.debug("Time display label created.")
-
-        # --- Date Display ---
-        # Outer frame for positioning date block
-        self.date_display_frame = ctk.CTkFrame(parent_frame, fg_color="transparent")
-        self.date_display_frame.grid(
-            row=0, column=1, sticky="nsew", # Changed sticky to fill vertically
-            padx=(element_padx, region_padx), # Element padding left, region padding right
-            pady=region_pady
-        )
-        # Center the inner content frame
-        self.date_display_frame.grid_columnconfigure(0, weight=1)
-        self.date_display_frame.grid_rowconfigure(0, weight=1)
-
-        # Inner frame for stacking labels
-        inner_date_labels_frame = ctk.CTkFrame(self.date_display_frame, fg_color="transparent")
-        inner_date_labels_frame.grid(row=0, column=0, sticky="") # Center
-
-        # Weekday Label
-        self.weekday_label = ctk.CTkLabel(
-            inner_date_labels_frame, text="Weekday",
-            height=1, font=self._get_font('weekday'),
-            text_color=text_color
-        )
-        self.weekday_label.pack(pady=(0, text_pady))
-
-        # Day Label
-        self.day_label = ctk.CTkLabel(
-            inner_date_labels_frame, text="00",
-            height=1, font=self._get_font('day_number'),
-            text_color=text_color
-        )
-        self.day_label.pack(pady=0)
-
-        # Month Year Label
-        self.month_year_label = ctk.CTkLabel(
-            inner_date_labels_frame, text="Month 0000",
-            height=1, font=self._get_font('month_year'),
-            text_color=text_color
-        )
-        self.month_year_label.pack(pady=(text_pady, 0))
-        logger.debug("Date display labels created.")
-
-    def _create_current_conditions_region(self):
-        """Creates widgets for the current conditions."""
-        logger.debug("Creating current conditions region widgets...")
-        parent_frame = self.current_conditions_frame
-        text_color = self._get_color('text')
-        title_color = self._get_color('text_secondary', text_color) # Use secondary if available
-        element_padx = config.ELEMENT_PADDING['padx']
-        element_pady = config.ELEMENT_PADDING['pady']
-        text_padx = config.TEXT_PADDING['padx']
-        text_pady = config.TEXT_PADDING['pady']
-        frame_radius = config.FRAME_CORNER_RADIUS
-        frame_color = self._get_color("background") # Use main background for sub-frames
-
-        current_col = 0
-
-        # --- Temperature Sub-section ---
-        logger.debug("Creating temperature display...")
-        self.temp_frame = ctk.CTkFrame(
-            parent_frame,
-            corner_radius=frame_radius,
-            fg_color=frame_color
-        )
-        self.temp_frame.grid(
-            row=0, column=current_col, sticky="nsew",
-            padx=element_padx, pady=element_pady
-        )
-        self.temp_frame.grid_rowconfigure(0, weight=0) # Title row
-        self.temp_frame.grid_rowconfigure(1, weight=1) # Value row (expands)
-        self.temp_frame.grid_columnconfigure(0, weight=1) # Single column expands
-
-        self.temp_title = ctk.CTkLabel(
-            self.temp_frame, text=get_translation('temperature', config.LANGUAGE),
-            height=1, font=self._get_font('current_temp_title'),
-            text_color=title_color
-        )
-        self.temp_title.grid(row=0, column=0, sticky="ew", padx=text_padx, pady=(text_pady*2, text_pady))
-
-        self.temp_value = ctk.CTkLabel(
-            self.temp_frame, text="--°C",
-            height=1, font=self._get_font('current_temp_value'),
-            text_color=text_color
-        )
-        self.temp_value.grid(row=1, column=0, sticky="n", padx=element_padx, pady=element_pady)
-        current_col += 1
-
-        # --- Humidity Sub-section (Optional) ---
-        self.humidity_frame = None
-        self.humidity_title = None
-        self.humidity_value = None
-        if config.OPTIONAL_ELEMENTS.get("show_current_humidity", True):
-            logger.debug("Creating humidity display...")
-            self.humidity_frame = ctk.CTkFrame(
-                parent_frame,
-                corner_radius=frame_radius,
-                fg_color=frame_color
-            )
-            self.humidity_frame.grid(
-                row=0, column=current_col, sticky="nsew",
-                padx=element_padx, pady=element_pady
-            )
-            self.humidity_frame.grid_rowconfigure(0, weight=0) # Title
-            self.humidity_frame.grid_rowconfigure(1, weight=1) # Value
-            self.humidity_frame.grid_columnconfigure(0, weight=1) # Column
-
-            self.humidity_title = ctk.CTkLabel(
-                self.humidity_frame, text=get_translation('humidity', config.LANGUAGE),
-                height=1, font=self._get_font('current_humidity_title'),
-                text_color=title_color
-            )
-            self.humidity_title.grid(row=0, column=0, sticky="ew", padx=text_padx, pady=(text_pady*2, text_pady))
-
-            self.humidity_value = ctk.CTkLabel(
-                self.humidity_frame, text="--%",
-                height=1, font=self._get_font('current_humidity_value'),
-                text_color=text_color
-            )
-            self.humidity_value.grid(row=1, column=0, sticky="n", padx=element_padx, pady=element_pady)
-            current_col += 1
-        else:
-            logger.debug("Humidity display is disabled in config.")
-
-        logger.debug("Current conditions region widgets created.")
-
-
-    def _create_forecast_region(self) -> None:
-        """Creates the frames and labels for the multi-day forecast region."""
-        logger.debug("Creating forecast region widgets...")
-        parent_frame = self.forecast_frame
-        text_color = self._get_color('text')
-        element_padx = config.ELEMENT_PADDING['padx']
-        element_pady = config.ELEMENT_PADDING['pady']
-        text_pady = config.TEXT_PADDING['pady']
-        frame_radius = config.FRAME_CORNER_RADIUS
-        frame_color = self._get_color("background") # Use main background for sub-frames
-
-        self.forecast_day_frames: List[Dict[str, ctk.CTkLabel]] = []
-        na_text = get_translation('not_available', config.LANGUAGE)
-        num_forecast_days = 3 # Hardcoded for now, could be configurable
-
-        for i in range(num_forecast_days):
-            logger.debug(f"Creating forecast frame for day {i+1}...")
-            day_frame = ctk.CTkFrame(
-                parent_frame,
-                corner_radius=frame_radius,
-                fg_color=frame_color
-            )
-            day_frame.grid(
-                row=0, column=i, sticky="nsew",
-                padx=element_padx, pady=element_pady
-            )
-            # Configure internal grid layout for each forecast day
-            day_frame.grid_columnconfigure(0, weight=1) # Single column expands
-            day_frame.grid_rowconfigure(0, weight=0) # Day name
-            day_frame.grid_rowconfigure(1, weight=1) # Icon (takes space)
-            day_frame.grid_rowconfigure(2, weight=0) # Condition
-            day_frame.grid_rowconfigure(3, weight=0) # Temp
-
-            # --- Create widgets for this forecast day ---
-            day_label = ctk.CTkLabel(
-                day_frame, text=f"Day {i+1}",
-                height=1, font=self._get_font('forecast_day'),
-                text_color=text_color
-            )
-            day_label.grid(row=0, column=0, pady=(text_pady * 2, text_pady))
-
-            icon_label = ctk.CTkLabel(day_frame, text="", image=None)
-            icon_label.grid(row=1, column=0, pady=element_pady)
-
-            condition_label = ctk.CTkLabel(
-                day_frame, text=na_text,
-                height=1, font=self._get_font('forecast_condition'),
-                text_color=text_color
-            )
-            condition_label.grid(row=2, column=0, pady=text_pady)
-
-            temp_label = ctk.CTkLabel(
-                day_frame, text="--° / --°",
-                height=1, font=self._get_font('forecast_temp'),
-                text_color=text_color
-            )
-            temp_label.grid(row=3, column=0, pady=(text_pady, text_pady * 2))
-
-            self.forecast_day_frames.append({
-                'frame': day_frame, # Keep ref to frame if needed later
-                'day': day_label,
-                'icon': icon_label,
-                'condition': condition_label,
-                'temp': temp_label
-            })
-            logger.debug(f"Forecast frame {i+1} created.")
-        logger.debug("Forecast region widgets created.")
+    def _create_forecast_region(self):
+        self.forecast_day_frames: List[Dict[str, Any]] = []
+        for index in range(3):
+            row = ctk.CTkFrame(self.forecast_frame, fg_color="transparent")
+            row.grid(row=index, column=0, sticky="ew", pady=(0, 4))
+            row.grid_columnconfigure(1, weight=1)
+            self._rule(row).grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 3))
+            day = self._label(row, "", "forecast_day")
+            day.grid(row=1, column=1, sticky="w")
+            icon = self._label(row, "", "forecast_day")
+            icon.grid(row=1, column=0, padx=(0, 5))
+            condition = self._label(row, "", "forecast_condition", "text_secondary")
+            condition.grid(row=2, column=0, columnspan=2, sticky="w")
+            temp = self._label(row, "", "forecast_temp")
+            temp.grid(row=1, column=2, rowspan=2, sticky="e")
+            self.forecast_day_frames.append(dict(frame=row, day=day, icon=icon,
+                                                 condition=condition, temp=temp))
 
     def _setup_bindings(self):
         """Sets up keyboard bindings."""
@@ -559,23 +227,19 @@ class AppWindow(ctk.CTk):
     def _resize_content(self, event):
         if event.widget is not self:
             return
-        # Font sizes in config are designed for a 1440 x 810 display.
-        # Status, icons and vertical spacing still need room as the window shrinks.
-        fixed_height = config.CONNECTION_FRAME_HEIGHT + config.FORECAST_ICON_SIZE[1] + 80
-        scale = min(1.0, event.width / 1440, (event.height - fixed_height) / (810 - fixed_height))
+        scale = min(event.width / 1440, event.height / 810)
         for key, font in self._fonts.items():
-            if key != "status_indicator":
-                size = max(1, round(config.FONTS[key][1] * scale))
-                if size != font.cget("size"):
-                    font.configure(size=size)
-
-        frame_width = event.width - 2 * config.ELEMENT_MARGINS["padx"]
-        card_width = frame_width // len(self.forecast_day_frames)
-        wrap = max(1, card_width - 2 * (config.ELEMENT_PADDING["padx"] + config.TEXT_PADDING["padx"]))
+            size = max(1, round(config.FONTS[key][1] * scale))
+            if size != font.cget("size"):
+                font.configure(size=size)
+        wave_size = (max(1, round(446 * scale)), max(1, round(56 * scale)))
+        if self.wave_image.cget("size") != wave_size:
+            self.wave_image.configure(size=wave_size)
         for card in self.forecast_day_frames:
-            label = card["condition"]
-            if label.cget("wraplength") != wrap:
-                label.configure(wraplength=wrap)
+            card["condition"].configure(wraplength=max(1, int(event.width * .35)))
+        for title in (self.temp_title, self.humidity_title):
+            if title:
+                title.configure(wraplength=max(1, int(event.width * .17)))
 
     # --- Public Update Methods ---
 
@@ -591,7 +255,7 @@ class AppWindow(ctk.CTk):
              self.time_label.configure(text="Error")
 
     def update_date(self, date_str: str):
-        """Updates the date display labels (weekday, day, month/year)."""
+        """Updates the weekday, large day and month, and year."""
         logger.debug(f"Updating date display with: {date_str}")
         try:
             parts = date_str.split(', ')
@@ -603,8 +267,10 @@ class AppWindow(ctk.CTk):
                     month = date_parts[1]
                     year = date_parts[2]
                     self.weekday_label.configure(text=weekday)
-                    self.day_label.configure(text=day)
-                    self.month_year_label.configure(text=f"{month} {year}")
+                    if config.LANGUAGE == "ru":
+                        month = month.lower()
+                    self.day_label.configure(text=f"{day} {month}")
+                    self.month_year_label.configure(text=year)
                     return
             # Fallback if parsing fails
             logger.warning(f"Could not parse date string: '{date_str}'. Displaying raw.")

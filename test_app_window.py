@@ -60,9 +60,14 @@ def _window_with_labels() -> AppWindow:
 def test_update_time_and_date_split_values_on_headless_window() -> None:
     window = _window_with_labels()
     window.update_time("08:09:10")
-    window.update_date("Friday, 04 July 2026")
+    with patch.object(config, "LANGUAGE", "en"):
+        window.update_date("Friday, 04 July 2026")
     assert window.time_label.values["text"] == "08:09"
-    assert window.day_label.values["text"] == "4"
+    assert window.day_label.values["text"] == "4 July"
+    assert window.month_year_label.values["text"] == "2026"
+    with patch.object(config, "LANGUAGE", "ru"):
+        window.update_date("Четверг, 19 Ноября 2026")
+    assert window.day_label.values["text"] == "19 ноября"
 
 
 def test_update_time_and_date_fall_back_to_raw_values_on_malformed_input() -> None:
@@ -281,6 +286,13 @@ def test_forecast_and_readings_fit_after_window_resize(monkeypatch) -> None:
         for size in ("1440x810", "800x480", "1920x1080"):
             window.geometry(f"{size}+8000+8000")
             window.update()
+            header = window.time_date_frame
+            forecast = window.forecast_frame
+            readings = window.current_conditions_frame
+            assert window.time_label.winfo_rootx() + window.time_label.winfo_width() <= window.day_label.winfo_rootx()
+            assert header.winfo_rooty() + header.winfo_height() <= forecast.winfo_rooty()
+            assert readings.winfo_rootx() + readings.winfo_width() <= forecast.winfo_rootx()
+            assert forecast.winfo_rooty() + forecast.winfo_height() <= window.status_bar_frame.winfo_rooty()
             for widget in (window.time_label, window.weekday_label, window.day_label,
                            window.month_year_label, window.temp_title, window.temp_value,
                            window.humidity_title, window.humidity_value,
@@ -313,7 +325,7 @@ def test_status_colors_have_readable_contrast_in_light_mode() -> None:
         linear = [v / 12.92 if v <= 0.04045 else ((v + 0.055) / 1.055) ** 2.4 for v in rgb]
         return sum(channel * weight for channel, weight in zip(linear, (0.2126, 0.7152, 0.0722), strict=True))
 
-    background = luminance(config.COLOR_THEME["frame_background"][1])
+    background = luminance(config.COLOR_THEME["background"][1])
     for key in ("status_text", "status_ok_text", "status_error_text"):
         foreground = luminance(config.COLOR_THEME[key][1])
         light, dark = max(background, foreground), min(background, foreground)

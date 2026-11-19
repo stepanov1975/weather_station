@@ -45,6 +45,7 @@ setup(
     package_data={
         "weather_display": [
             "assets/weather_icons/*.png",
+            "assets/interference_waves.png",
             "py.typed",
         ],
     },

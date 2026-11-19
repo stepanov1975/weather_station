@@ -374,6 +374,9 @@ def test_exit_fullscreen_invokes_window_operations_headlessly() -> None:
 
 def test_app_window_builds_its_widget_tree_with_headless_toolkit() -> None:
     class Widget:
+        def place(self, **_kwargs: object) -> None:
+            pass
+
         def grid(self, **_kwargs: object) -> None:
             pass
 
