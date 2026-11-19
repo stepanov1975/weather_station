@@ -110,13 +110,13 @@ FONTS = {
     "current_temp_title": (None, 26, "normal"),
     "current_humidity_value": (None, 84, "bold"),
     "current_humidity_title": (None, 26, "normal"),
-    "forecast_day": (None, 31, "bold"),
-    "forecast_condition": (None, 24, "normal"),
-    "forecast_temp": (None, 30, "normal"),
+    "forecast_day": (None, 35, "bold"),
+    "forecast_condition": (None, 27, "normal"),
+    "forecast_temp": (None, 34, "normal"),
     "status_indicator": (None, 19, "normal"),
 }
 
-FORECAST_ICON_SIZE = (26, 26)
+FORECAST_ICON_SIZE = (140, 84)
 
 # --- Optional Elements ---
 # Flags to control the visibility of certain UI components.

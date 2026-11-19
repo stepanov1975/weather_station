@@ -202,18 +202,20 @@ class AppWindow(ctk.CTk):
         return title, value
 
     def _create_forecast_region(self):
+        self._forecast_icon_size = config.FORECAST_ICON_SIZE
         self.forecast_day_frames: List[Dict[str, Any]] = []
         for index in range(3):
             row = ctk.CTkFrame(self.forecast_frame, fg_color="transparent")
-            row.grid(row=index, column=0, sticky="ew", pady=(0, 4))
+            row.grid(row=index, column=0, sticky="nsew")
             row.grid_columnconfigure(1, weight=1)
-            self._rule(row).grid(row=0, column=0, columnspan=3, sticky="ew", pady=(0, 3))
+            row.grid_rowconfigure((1, 2), weight=1)
+            self._rule(row).grid(row=0, column=0, columnspan=3, sticky="ew")
             day = self._label(row, "", "forecast_day")
-            day.grid(row=1, column=1, sticky="w")
+            day.grid(row=1, column=1, sticky="sw")
             icon = self._label(row, "", "forecast_day")
-            icon.grid(row=1, column=0, padx=(0, 5))
+            icon.grid(row=1, column=0, rowspan=2, padx=(0, 5))
             condition = self._label(row, "", "forecast_condition", "text_secondary")
-            condition.grid(row=2, column=0, columnspan=2, sticky="w")
+            condition.grid(row=2, column=1, sticky="nw")
             temp = self._label(row, "", "forecast_temp")
             temp.grid(row=1, column=2, rowspan=2, sticky="e")
             self.forecast_day_frames.append(dict(frame=row, day=day, icon=icon,
@@ -237,8 +239,17 @@ class AppWindow(ctk.CTk):
         wave_size = (max(1, round(446 * scale)), max(1, round(56 * scale)))
         if self.wave_image.cget("size") != wave_size:
             self.wave_image.configure(size=wave_size)
-        for card in self.forecast_day_frames:
-            card["condition"].configure(wraplength=max(1, int(event.width * .35)))
+        icon_width, icon_height = config.FORECAST_ICON_SIZE
+        size = (max(1, round(icon_width * scale)), max(1, round(icon_height * scale)))
+        if size != self._forecast_icon_size:
+            self._forecast_icon_size = size
+            self.icon_handler.icon_cache.clear()
+            for card in self.forecast_day_frames:
+                if card.get("icon_code") is not None:
+                    self._set_forecast_icon(card, card["icon_code"])
+        for index, card in enumerate(self.forecast_day_frames):
+            self.forecast_frame.grid_rowconfigure(index, minsize=max(1, round(90 * scale)))
+            card["condition"].configure(wraplength=max(1, int(event.width * .29)))
         for title in (self.temp_title, self.humidity_title):
             if title:
                 title.configure(wraplength=max(1, int(event.width * .17)))
@@ -322,6 +333,15 @@ class AppWindow(ctk.CTk):
             self.humidity_value.configure(text=humidity_text)
             logger.debug(f"Humidity updated to: {humidity_text}")
 
+    def _set_forecast_icon(self, card, code):
+        card["icon_code"] = code
+        image = self.icon_handler.load_icon(code, self._forecast_icon_size) if code is not None else None
+        if image:
+            card["icon"].configure(image=image, text="")
+            card["icon"].grid()
+        else:
+            card["icon"].grid_remove()
+
     def update_forecast(self, forecast_result: Dict[str, Any]):
         """
         Updates the multi-day forecast display section.
@@ -335,7 +355,6 @@ class AppWindow(ctk.CTk):
 
         forecast_data: List[Dict[str, Any]] = forecast_result.get('data', [])
         na_text = get_translation('not_available', config.LANGUAGE)
-        icon_size = config.FORECAST_ICON_SIZE
 
         for i, day_widgets in enumerate(self.forecast_day_frames):
             if i < len(forecast_data):
@@ -353,13 +372,7 @@ class AppWindow(ctk.CTk):
                 day_widgets['day'].configure(text=day_name)
 
                 # Update Icon
-                icon_image = self.icon_handler.load_icon(icon_code, icon_size) if icon_code is not None else None
-                if icon_image:
-                    day_widgets['icon'].configure(image=icon_image, text="")
-                    day_widgets['icon'].grid()
-                else:
-                    day_widgets['icon'].grid_remove()
-                    logger.warning(f"Failed to load forecast icon for code: {icon_code}")
+                self._set_forecast_icon(day_widgets, icon_code)
 
                 # Update Condition Text
                 translated_condition = translate_weather_condition(condition, config.LANGUAGE) if condition else na_text
@@ -379,7 +392,7 @@ class AppWindow(ctk.CTk):
                 # No data for this frame, clear it
                 logger.debug(f"No forecast data available for day {i+1}. Clearing frame.")
                 day_widgets['day'].configure(text=na_text)
-                day_widgets['icon'].grid_remove()
+                self._set_forecast_icon(day_widgets, None)
                 day_widgets['condition'].configure(text="")
                 day_widgets['temp'].configure(text="")
 

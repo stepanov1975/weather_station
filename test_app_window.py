@@ -49,6 +49,7 @@ def _window_with_labels() -> AppWindow:
     window.temp_value = _Widget()
     window.humidity_value = _Widget()
     window.forecast_day_frames = _forecast_day_frames()
+    window._forecast_icon_size = config.FORECAST_ICON_SIZE
     window.icon_handler = Mock()
     window.status_bar_frame = object()
     window.network_status_label = _Widget()
@@ -289,6 +290,10 @@ def test_forecast_and_readings_fit_after_window_resize(monkeypatch) -> None:
             header = window.time_date_frame
             forecast = window.forecast_frame
             readings = window.current_conditions_frame
+            scale = min(window.winfo_width() / 1440, window.winfo_height() / 810)
+            assert card["frame"].winfo_height() >= round(90 * scale)
+            assert card["icon"].winfo_height() >= round(82 * scale)
+            assert card["day"].winfo_rootx() == card["condition"].winfo_rootx()
             assert window.time_label.winfo_rootx() + window.time_label.winfo_width() <= window.day_label.winfo_rootx()
             assert header.winfo_rooty() + header.winfo_height() <= forecast.winfo_rooty()
             assert readings.winfo_rootx() + readings.winfo_width() <= forecast.winfo_rootx()
