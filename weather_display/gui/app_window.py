@@ -1,6 +1,7 @@
 """CustomTkinter split-board display for the clock, IMS readings and forecast."""
 
 import logging
+import tkinter as tk
 from typing import Dict, List, Any, Optional
 import os
 from datetime import datetime
@@ -186,8 +187,9 @@ class AppWindow(ctk.CTk):
                             text_color=self._get_color(color), anchor="w", justify="left")
 
     def _rule(self, parent):
-        return ctk.CTkFrame(parent, width=1, height=1, corner_radius=0,
-                            fg_color=self._get_color("divider"))
+        # A native frame preserves a one-pixel rule at kiosk scaling.
+        return tk.Frame(parent, width=1, height=1, borderwidth=0, highlightthickness=0,
+                        background=self._get_color("divider"))
 
     def _reading(self, key, font_prefix, initial_value, column):
         parent = self.current_conditions_frame
